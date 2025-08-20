@@ -1,0 +1,241 @@
+---
+title: "2. Generating FVS Init from Treemap"
+author: "Kayla Johnston and Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# Files needed:
+-  Blank FVS Init excel workbook
+-  Outputs from Step 1, including list of TreeMap Stand ID's
+
+```{r, include = F}
+# load libraries
+library(terra) # for handling spatial data
+library(foreign) # for reading in database files (and other data file types)
+library(dplyr) # for data manipulation
+library(readxl) # for reading excel workbooks
+library(openxlsx) # for writing excel workbooks
+library(sf)
+library(mapview)
+require(writexl)
+```
+
+# Setup
+
+*These are the things you have to edit between runs*
+
+## Define which year of TreeMap you want to use
+```{r}
+tm_year <- 2022 # Options = 2016, 2020, 2022
+```
+
+## Define the name of the project
+```{r}
+proj_name <- "8GG23602_Sierra_Foothill_Conservancy"
+```
+
+# Load output of Step 1
+
+## Define input and output dir
+```{r}
+treemap_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
+input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
+output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Input"
+```
+
+These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
+```{r}
+# list the excel files in inputs_dir that end with "_areas_TM"
+area_files <- list.files(input_dir, pattern = "_areas_TM.xlsx$", full.names = TRUE)
+if(length(area_files)>0){
+  print("input files with areas of each StandID are:")
+  print(tools::file_path_sans_ext(basename(area_files)))
+} else{
+  print("***ALERT*** Missing input files with areas of each StandID ")
+}
+```
+
+## TreeMap tree tables
+```{r}
+trees16file <- file.path(treemap_dir, "TreeMap2016/TreeMap2016_tree_table.csv")
+trees20file <- file.path(treemap_dir, "TreeMap2016/TreeMap2016_tree_table.csv")
+trees22file <- file.path(treemap_dir, "TreeMap2022/TreeMap2022_CONUS_Tree_Table.csv")
+```
+
+Only load the TM vintage you need because it is slow to load
+```{r}
+if(tm_year == 2016){
+  trees16 <- read.csv(trees16file, colClasses = c("character", "character"))
+  tm_trees <- trees16 %>% 
+    rename(TM_ID = tm_id)
+} else if(tm_year == 2020){
+  trees20 <- read.csv(file = trees20file, colClasses = c("character", "character"))
+  tm_trees <- trees20 %>% 
+    rename(TM_ID = tm_id)
+} else if(tm_year == 2022){
+  trees22 <-  read.csv(file = trees22file, colClasses = c("character", "character"))
+  tm_trees <- trees22
+} else{
+  print("ERROR: Not a valid TreeMap year")
+}
+```
+
+
+## Prep tm_trees  
+```{r}
+tm_trees <- tm_trees %>% 
+  mutate(TPA_UNADJ = as.numeric(TPA_UNADJ)) %>%  
+  mutate(DIA = as.numeric(DIA))
+```
+
+Notes on the issue with NA values of TPA_UNADJ:
+  - FIA STATUSCD=2 means that tree is dead 
+  - FVS HISTORY codes 1-5 mean tree is alive
+      - FVS codes 6 and 8 mean tree is dead
+  - in the LEMMA workflow, we only used History codes 1, 6, and 8. 
+  - in the LEMMA workflow, all trees had values for DBH and Ht
+  - in tm_trees,the only status codes are 1 and 2 (alive or dead)
+  - in tm_trees, all the trees with NA TPA_UNADJ are STATUSCD = 2 (dead), but not all dead trees have TPA_UNADJ = NA
+  - in tm_trees, 5% of total records have NA values of TPA_UNADJ, After removing trees with NA diameter and height, 1.5% of records have NA for TPA_UNADJ
+  
+## Remove trees without DIA and Ht values
+```{r}
+tm_trees <- tm_trees %>% 
+  filter(!is.na(DIA) & !is.na(HT))
+```
+
+## Remove records where TPA_UNADJ is NA
+```{r}
+tm_trees <- tm_trees %>% 
+  filter(!is.na(TPA_UNADJ))
+```
+
+## Read in blank FVS Init .xlsx sheets as blank stand init, plot init and tree init dataframes
+```{r}
+blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
+blank_stand <- read_excel(blank_db, sheet = "FVS_StandInit")
+blank_tree <- read_excel(blank_db, sheet = "FVS_TreeInit")
+```
+
+# Function to make the new stand_init table
+```{r}
+# tm <- area_files[1] # for debugging
+tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm_year) {
+  #' @param tm filepath for the list of treemap IDs generated in step 1, with FVS variant column
+  #' @param blank_stand_init the blank stand init
+  #' @param proj_name the project name
+  #' @param tm_year the vintage of the TreeMap data you are using
+  #' @return A new , filled stand init table for the AOI
+  df <- read_excel(area_file) %>% 
+    mutate(TM_ID = as.character(TM_ID))
+  num_polygons <- length(df) #get the number of unique treemapper IDs
+  variant_list <- list(unique(df$FVSVariant))
+  # Check whether any stands have same TM_ID but different FVS code
+  same_TM_diff_Var <- df %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    count() %>% 
+    filter(n>1) %>% 
+    nrow()
+  if(same_TM_diff_Var==0){
+    print("There are no polygons with the same TM_ID but multiple FVS variants")
+  }
+  stand_init <- blank_stand_init %>% 
+    mutate(STAND_ID = as.character(STAND_ID))
+  stand_init <- add_row(stand_init, STAND_ID = df$TM_ID)
+  stand_init$VARIANT <- df$FVSVariant #fill variant column
+  stand_init$INV_YEAR <- tm_year #fill inventory year column
+  stand_init$GROUPS <- "All_Stands" #fill groups column
+  stand_init$PROJECT_NAME <- proj_name #fill project name column
+  stand_init$LATITUDE <- df$Latitude #fill latitude column
+  stand_init$LONGITUDE <- df$Longitude #fill longtitude column
+  stand_init$LOCATION <- df$FVSLocCode #fill location column
+  stand_init$INV_PLOT_SIZE <- 1 #fill inventory plot size column
+  stand_init$BRK_DBH <- 999 #fill brk_dbh column
+  stand_init$NUM_PLOTS <- 1 #fill num_plots column
+  return(stand_init)
+}
+```
+
+# Function to make new tree init table
+
+## List the columns that were generated by the LEMMA workflow
+```{r}
+tree_cols <- c("Stand_CN", "Stand_ID","Plot_ID","Tree_ID", "Tree_Count"  ,"History", "Species",    "DBH","DG","Ht", "HTG",    "HtTopK"  ,"CrRatio",    "Damage1"  ,    "Severity1"   , "Damage2"  ,    "Severity2"  ,  "Damage3"  ,   "Severity3" ,   "TreeValue"  ,  "Prescription", "Age"   )
+```
+
+## Tree init function
+```{r}
+tm_tree_init <- function(area_file, blank_tree_init, tm_tree_list) {
+    df <- read_excel(area_file) %>% 
+      mutate(TM_ID = as.character(TM_ID))
+    df_trees_full <- merge(df, tm_tree_list, by = "TM_ID", all.x = TRUE) 
+    
+    if ("CN" %in% names(df_trees_full)) {
+      # Filter records where 'CN' is not NA
+      df_trees_full <- df_trees_full[!is.na(df_trees_full$CN), ] %>% 
+      rename(Stand_CN = CN)
+    } else if ("PLT_CN" %in% names(df_trees_full)) {
+      df_trees_full <- df_trees_full %>% 
+        rename(Stand_CN = PLT_CN)
+    }
+    
+    # Summing across values of TM_ID reduces FVS computing time. In order to sum across TM_ID 
+    # values, I have to convert TPA to tree counts across the whole area. I'm not going to do 
+    # that right now and instead stick with TPA and leave TM_ID values 
+    
+    df_trees <- df_trees_full %>% 
+      mutate(Stand_ID = paste(TM_ID, STAND_ID, sep = "_")) %>% 
+      select(Stand_CN, Stand_ID, TPA_UNADJ, STATUSCD, SPCD, DIA, HT, CR) 
+    
+    tree_list <- df_trees %>% 
+      mutate(Tree_ID = c(1:nrow(df_trees))) %>% 
+      mutate(Plot_ID = 1) %>% 
+      mutate(History = case_when(
+        STATUSCD == "2" ~ "8",
+        TRUE ~STATUSCD  # Keep existing HISTORY values if STATUSCD is not 2
+      )) %>% 
+      rename(Species = SPCD, 
+             DBH = DIA,
+             Ht = HT,
+             Tree_Count = TPA_UNADJ, 
+             CrRatio = CR) 
+    
+    missing_cols <- setdiff(tree_cols, colnames(tree_list))
+
+    for (col in missing_cols) {
+      tree_list[[col]] <- NA
+    }
+
+    # Reorder columns so they match LEMMA input format
+    tree_list <- tree_list %>%
+      select(all_of(tree_cols))
+    
+    return(tree_list)
+}
+```
+
+
+# Build FVS inputs
+```{r}
+for (i in 1:length(area_files)){
+  print(i)
+  stand_table <- tm_stand_init(area_file = area_files[i], 
+                blank_stand_init = blank_stand, 
+                proj_name = proj_name, 
+                tm_year = tm_year) 
+  tree_table <- tm_tree_init(area_file = area_files[i],
+             blank_tree_init = blank_tree,
+             tm_tree_list = tm_trees)
+  basename <- tools::file_path_sans_ext(basename(area_files[i]))
+  basename <- gsub("_areas", "", basename)
+  file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
+  write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
+  print(paste("Created FVS inputs saved as", file))
+}
+```
+
+

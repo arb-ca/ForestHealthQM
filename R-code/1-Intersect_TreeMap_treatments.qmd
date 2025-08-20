@@ -49,6 +49,11 @@ fvs_varloc_shp_path <- file.path(input_dir, "../../FVS_files/FVSVariantMap202105
 fvs_varloc <- st_read(fvs_varloc_shp_path, )
 ```
 
+## Clear output directory (`temp`)
+```{r}
+unlink(paste0(output_dir, "/*"), recursive = TRUE)
+```
+
 
 ## Read in TreeMap dataset(s)
 
@@ -86,11 +91,10 @@ for (zip_file in zip_files) {
 }
 
 print("All files have been extracted.")
-
 ```
 
 
-# List shapefiles in dir
+# List shapefiles in dir,  ignoring those with "buffer" in the name
 ```{r}
 shapefiles <- list.files(
   path = trt_dir,
@@ -98,6 +102,8 @@ shapefiles <- list.files(
   full.names = TRUE,
   recursive = TRUE
 )
+
+shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
 basename(shapefiles)
 ```
 
@@ -106,10 +112,10 @@ basename(shapefiles)
 shp_list <- list()
 for(i in 1:length(shapefiles)){
   shp <- st_read(shapefiles[i], quiet= T)
-  if(length(shp_all$Grant_ID) > 1){
-    for(j in 1:length(shp_all$Grant_ID)){
-      shp_grant <- shp_all %>% 
-        filter(Grant_ID == shp_all$Grant_ID[j])
+  if(length(shp$Grant_ID) > 1){
+    for(j in 1:length(shp$Grant_ID)){
+      shp_grant <- shp %>% 
+        filter(Grant_ID == shp$Grant_ID[j])
       shp_list[[j]] <- shp_grant
     }
   }
@@ -175,7 +181,7 @@ map_list <- list()
 for (i in 1:length(shp_list)) {
   print(i)
   shp <- shp_list[[i]]
-  if(length(shp_all$Grant_ID) > 1){
+  if(length(shp$Grant_ID) > 1){
     base_name <- paste("SB63", shp$Grant_ID, sep = "_")
   } else{
     base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
@@ -208,7 +214,7 @@ for (i in 1:length(shp_list)) {
   
   # Remove columns
   intersected_sf <- intersected_sf %>% 
-    select(TM_ID, FVSVariant, STAND_ID, Latitude, Longitude)
+    select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
   # Calculate areas
   intersected <- intersected_sf %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
