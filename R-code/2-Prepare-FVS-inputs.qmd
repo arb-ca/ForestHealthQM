@@ -1,0 +1,202 @@
+---
+title: "2. Create FVS input files"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This run is for project `21-FH-MEU-041`
+
+```{r, include =F}
+require(tidyverse)
+require(readxl)
+require(writexl)
+```
+
+This code replaces the code “lemmaformat.R” and the access queries
+
+# Setup 
+
+## Set Input Year of data (2012 for currently used LEMMA)
+```{r}
+input_year <- 2012
+```
+
+## Set your variant
+```{r}
+variant <- "NC"
+```
+
+
+## Set directories
+*Note:* Replace these with the folders on your computer where the files are stored.
+```{r}
+input_dir <- "~/CCI/QMs/Forest Health QM/Test runs/21-FH_MEU-041/spatial_outputs"
+FVS_tables_dir <- "~/CCI/QMs/Forest Health QM/LEMMA_GNN_FVS_access_exports/"
+```
+
+
+## Read in `FVS_STAND_INIT` and `FVS_TREE_INIT` and `FVS_GroupAddFilesAndKeywords` from Rdata
+
+These tables were exported from the original Access database to .Rdata format
+```{r}
+load(file = file.path(FVS_tables_dir, "FVS_TREE_INIT.Rdata"))
+load(file = file.path(FVS_tables_dir, "FVS_STAND_INIT.Rdata"))
+load(file = file.path(FVS_tables_dir, "FVS_GroupAddFilesAndKeywords.Rdata"))
+```
+
+## Format FVS_STAND_INIT
+```{r}
+FVS_STAND_INIT <- FVS_STAND_INIT %>% 
+ mutate(Inv_Year = 2012) %>% 
+ mutate(Stand_ID = as.numeric(Stand_ID))
+```
+
+```{r}
+FVS_STAND_INIT <- FVS_STAND_INIT %>% 
+  select(-Sam_Wt)
+```
+
+
+## Define input files
+
+These files were created by the script `1-Intersect_LEMMA_treatments.qmd`
+```{r}
+# list the excel files in inputs_dir that end with "_areas"
+input_files <- list.files(input_dir, pattern = "_areas.xlsx$", full.names = TRUE)
+```
+
+```{r}
+area_files <- list.files(input_dir, pattern = "_areas", full.names = TRUE)
+if(length(area_files)>0){
+  print("input files with areas of each StandID are:")
+  print(tools::file_path_sans_ext(basename(input_files)))
+} else{
+  print("***ALERT*** Missing input files with areas of each StandID ")
+}
+
+```
+
+## Set vars of interest
+```{r}
+stand_init_vars <- "Stand_CN, 
+          Stand_ID, 
+          Variant, 
+          Inv_Year, 
+          Groups, 
+          AddFiles, 
+          FVSKeywords, 
+          Latitude, 
+          Longitude, 
+          Region, 
+          Forest, 
+          District, 
+          Compartment, 
+          Location, 
+          Ecoregion, 
+          PV_Code, 
+          PV_Ref_Code, 
+          Age, 
+          Aspect, 
+          Slope, 
+          Elevation, 
+          ElevFt, 
+          Basal_Area_Factor, 
+          Inv_Plot_Size, 
+          Brk_DBH, 
+          Num_Plots, 
+          NonStk_Plots, 
+          Sam_Wt, 
+          Stk_Pcnt, 
+          DG_Trans, 
+          DG_Measure, 
+          HTG_Trans, 
+          HTG_Measure, 
+          Mort_Measure, 
+          Max_Ba, 
+          Max_SDI, 
+          Site_Species, 
+          Site_Index, 
+          Model_Type, 
+          Physio_Region, 
+          Forest_Type, 
+          State, 
+          County, 
+          Fuel_Model, 
+          Fuel_0_25, 
+          Fuel_25_1, 
+          Fuel_0_1, 
+          Fuel_1_3, 
+          Fuel_3_6, 
+          Fuel_6_12, 
+          Fuel_gt_12, 
+          Fuel_Litter, 
+          Fuel_Duff, 
+          Photo_Ref, 
+          Photo_code"
+tree_init_vars <- "Stand_CN,	
+        Stand_ID,	
+        Plot_ID,	
+        Tree_ID,	
+        Tree_Count,	
+        History,	
+        Species,	
+        DBH,	
+        DG,	
+        Ht,	
+        HTG,	
+        HtTopK,	
+        CrRatio,	
+        Damage1,	
+        Severity1,	
+        Damage2,	
+        Severity2,	
+        Damage3,	
+        Severity3,	
+        TreeValue,	
+        Prescription,	
+        Age"
+```
+
+# Run the Access query analyses iteratively across input files to create FVS input tables
+
+```{r}
+if(variant == "WS"){
+  Groups_fill <- "All_Stands variant = WS"
+} else if(variant == "NC") {
+  Groups_fill <- "All_Stands variant = NC"
+}
+```
+
+
+```{r}
+for(i in area_files){
+  LEMMA__import <- read_excel(i)
+  FVS_StandInit <- left_join(LEMMA__import, FVS_STAND_INIT, by = "Stand_ID") %>% 
+    select(all_of(str_split(stand_init_vars, ",\\s*")[[1]])) %>% 
+    mutate(Groups = Groups_fill) %>% 
+    mutate(Variant = variant) %>% 
+    filter(Stand_ID>0)
+  FVS_TREE_INIT <- FVS_TREE_INIT %>% 
+    mutate(Stand_ID = as.numeric(Stand_ID))
+  FVS_TreeInit <- inner_join(LEMMA__import, FVS_TREE_INIT, by = "Stand_ID") %>% 
+    select(all_of(str_split(tree_init_vars, ",\\s*")[[1]])) 
+  basename <- tools::file_path_sans_ext(basename(i))
+  basename <- gsub("_areas", "", basename)
+  basename <- gsub("LEMMA_import_", "", basename)
+  file <- paste0(input_dir, "/FVS_input_", basename, ".xlsx")
+  write_xlsx(list(FVS_GroupAddFilesAndKeywords=FVS_GroupAddFilesAndKeywords, FVS_StandInit=FVS_StandInit, FVS_TreeInit=FVS_TreeInit), file)
+  print(paste("done with", basename))
+  print(paste(nrow(FVS_StandInit), "stands"))
+}
+```
+
+
+
+
+
+
+
