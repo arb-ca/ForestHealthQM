@@ -188,7 +188,7 @@ tm_tree_init <- function(area_file, blank_tree_init, tm_tree_list) {
     # that right now and instead stick with TPA and leave TM_ID values 
     
     df_trees <- df_trees_full %>% 
-      mutate(Stand_ID = paste(TM_ID, STAND_ID, sep = "_")) %>% 
+      mutate(Stand_ID = TM_ID) %>% 
       select(Stand_CN, Stand_ID, TPA_UNADJ, STATUSCD, SPCD, DIA, HT, CR) 
     
     tree_list <- df_trees %>% 
