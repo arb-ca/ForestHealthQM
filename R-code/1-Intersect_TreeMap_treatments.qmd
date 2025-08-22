@@ -37,6 +37,12 @@ tm <- 2022 # Options = 2016, 2020, 2022
 trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/FY23-24_8GG23602_Sierra_Foothill_Conservancy/Shapefiles"
 ```
 
+## Define directory with CA perimeter shapefile in it
+```{r}
+ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
+```
+
+
 ## Define input and output dir
 ```{r}
 input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
@@ -248,3 +254,18 @@ map_list[[3]]
 print(names(map_list)[4])
 map_list[[4]]
 ```
+
+# plot the project in California to check fVs variant selection
+```{r}
+ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
+```
+
+```{r}
+ggplot(data = shp) +
+    geom_sf(col = "red", size = 50) +
+    theme(legend.position = "none")+
+    geom_sf(data = ca, fill = NA)+
+    geom_sf(data = st_read(shapefiles[2]), col = "red", size = 50)+
+    geom_sf(data = st_read(shapefiles[3]), col = "red", size = 50)
+```
+

@@ -1,0 +1,95 @@
+---
+title: "4. Calculate Wildfire Probability"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This uses the *average* of 2011 and 2047 FSIM 
+# This is for project emailed by Kevin on 7/31/2025
+
+```{r, include =F}
+# Load required libraries
+library(sf)
+library(dplyr)
+library(terra)
+library(mapview)
+library(stringr)
+```
+
+## Load data
+
+### Shapefile
+```{r}
+trt_dir = "~/CCI/QMs/Forest Health QM/Test runs/FY23-24_8GG23602_Sierra_Foothill_Conservancy/Shapefiles"
+```
+
+```{r}
+# List all shapefiles in nested folders
+shp_files <- list.files(
+  trt_dir,
+  pattern = "\\.shp$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+```
+
+### Wildfire probability map
+```{r}
+wf_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/FSIM/fsim_mean.tif"
+wf <- rast(wf_path)
+```
+
+## Loop Through and Intersect
+```{r}
+# To store results
+mean_results <- data.frame(
+  shapefile = character(),
+  mean_value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+shp_path <- shp_files[1]
+
+for (shp_path in shp_files) {
+  # Read shapefile
+  shp <- st_read(shp_path, quiet = TRUE)
+  shp <- st_transform(shp, st_crs(wf))
+  shp <- shp %>% st_zm()
+  shp_buffer <- st_buffer(shp, dist=500)
+  # Convert sf -> terra vector
+  v_shp_buffer <- vect(shp_buffer)
+  v_shp <- vect(shp)
+  
+  # Use buffered polygons to crop but original polygons to mask
+  cropped_raster <- crop(wf, v_shp_buffer)
+  clipped_raster <- mask(cropped_raster, v_shp)
+  
+  name <- str_sub(shp_path, -10)
+  name <- str_sub(name, 1, -5)
+  assign(paste("raster", name, sep ="_"), clipped_raster)
+  assign(paste("v_shp", name, sep ="_"), v_shp)
+  # Remove 0 values from raster
+  clipped_raster[clipped_raster == 0] <- NA
+  # Calculate mean value of raster within shapefile
+  m_val <- global(clipped_raster, fun = "mean", na.rm = TRUE)[1,1]
+
+  # Store result
+  mean_results <- rbind(
+    mean_results,
+    data.frame(
+      shapefile = basename(shp_path),
+      mean_value = m_val*100
+    )
+  )
+  plot(clipped_raster)
+  plot(v_shp, add = T)
+}
+
+# View final table
+print(mean_results)
+
+```

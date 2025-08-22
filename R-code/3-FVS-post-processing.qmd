@@ -1,0 +1,116 @@
+---
+title: "3. Calculate carbon results from FVS output"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This run is for project `FY23-24_8GG23602_Sierra_Foothill_Conservancy`
+## Treatment = `FR1`
+## Shapefile = `57520486_4_20240115.shp`
+
+# Setup
+```{r, include = F}
+require(tidyverse)
+require(readxl)
+require(ggplot2)
+```
+
+## Define folder where the FVS outputs are located
+*Note:* Replace this for the file folder on your computer
+```{r}
+fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
+areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/areas"
+```
+
+## Load the FVS output files
+```{r}
+df <- read_excel(paste0(fvs_output_dir, "/57520486_FR1.xlsx"))
+```
+
+## Load the data tables with areas
+```{r}
+areas <- read_excel(paste0(areas_dir, "/57520486_4_20240115_areas_TM.xlsx"))
+```
+
+# Delete non-forested stands & mutate stand ID to match FVS output format
+```{r}
+areas <- areas %>% 
+  filter(TM_ID > 0) %>% 
+  mutate(Stand_ID = as.character(TM_ID))
+```
+
+```{r}
+df_means <- df %>% 
+  group_by(Year, MgmtID) %>% 
+  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live)) 
+df_means <- df_means %>% 
+  ungroup()
+```
+
+
+```{r}
+ggplot(df_means) +
+  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = MgmtID, group = MgmtID)) +
+  labs(
+    y = "Live Aboveground Carbon (C)") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(df %>% filter(MgmtID == "BSWF"))+
+  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))
+```
+
+
+# Filter to last year of project
+```{r}
+df <- df %>% 
+  filter(Year == max(df$Year))
+```
+
+# Plot the distribution of ending carbon in each scenario
+```{r}
+ggplot(df, aes(x = factor(MgmtID), y = Aboveground_Total_Live)) +
+  geom_violin(fill = "lightblue", color = "black", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.5) +  # optional boxplot overlay
+  labs(
+    x = "Management ID",
+    y = "Live Aboveground Carbon (C) at project end",
+    title = "Distribution of Total_C by MgmtID"
+  ) +
+  theme_minimal()
+
+```
+
+
+# Merge with areas from pre-FVS files and calculate results
+-  Calculate total ending year carbon for each scenario
+-  Print results in the order they appear in `FRM_Calculator_Tool`
+```{r}
+df_list <- c("TRNF", "TRWF", "BSNF", "BSWF")
+# Loop through each data frame
+for (name in df_list) {
+  df_i <- df %>% 
+    filter(MgmtID == name)
+   
+  df_i <- left_join(df_i, areas, join_by(StandID==Stand_ID))
+  
+  # Create a new column, e.g. "Biomass_Area"
+  df_i <- df_i%>% 
+    mutate(Total_C = (Aboveground_Total_Live + Belowground_Live) * area_ac)
+  
+  # Save it back into the list
+  assign(name, df_i)
+  
+  # Sum carbon and label it
+  sum <- sum(df_i$Total_C)
+ 
+  print(paste("total C in", name, "=", round(sum, 0), "MTC"))
+  assign(paste(name, "sum_C", sep = "_"), sum)
+  
+}
+```
