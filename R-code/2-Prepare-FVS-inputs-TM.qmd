@@ -47,6 +47,12 @@ input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Input"
 ```
 
+## Define where to find blank FVS database
+```{r}
+blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
+```
+
+
 These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
@@ -116,7 +122,6 @@ tm_trees <- tm_trees %>%
 
 ## Read in blank FVS Init .xlsx sheets as blank stand init, plot init and tree init dataframes
 ```{r}
-blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
 blank_stand <- read_excel(blank_db, sheet = "FVS_StandInit")
 blank_tree <- read_excel(blank_db, sheet = "FVS_TreeInit")
 ```

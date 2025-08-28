@@ -235,37 +235,42 @@ for (i in 1:length(shp_list)) {
 ```
 
 # Plot each treatment individually
-```{r, echo =FALSE}
-print(names(map_list)[1])
-map_list[[1]]
+```{r}
+for (i in seq_along(map_list)) {
+  print(names(map_list)[i])
+  print(map_list[[i]])
+}
 ```
 
-```{r, echo =FALSE}
-print(names(map_list)[2])
-map_list[[2]]
-```
-
-```{r, echo =FALSE}
-print(names(map_list)[3])
-map_list[[3]]
-```
-
-```{r, echo =FALSE}
-print(names(map_list)[4])
-map_list[[4]]
-```
 
 # plot the project in California to check fVs variant selection
 ```{r}
 ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
 ```
 
+# Plot treatments with FVS variants
 ```{r}
-ggplot(data = shp) +
-    geom_sf(col = "red", size = 50) +
-    theme(legend.position = "none")+
+fvs_varloc <- fvs_varloc %>% 
+  filter(FVSVariant %in% c("WS", "NC", "CA", "SO")) %>% 
+  group_by(FVSVariant) |>
+  summarise(geometry = st_union(geometry), .groups = "drop")
+
+```
+
+
+```{r}
+
+centroids <- st_centroid(shp %>% st_zm())
+circle_buffer <- st_buffer(centroids, dist = 8000)
+
+ggplot() +
+      geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
     geom_sf(data = ca, fill = NA)+
-    geom_sf(data = st_read(shapefiles[2]), col = "red", size = 50)+
-    geom_sf(data = st_read(shapefiles[3]), col = "red", size = 50)
+  geom_sf(data = circle_buffer, col = "red", fill = "red")
+
+```
+
+```{r}
+print(paste("FVS Variant selection for", basename(file_name), "is", unique(intersected$FVSVariant)))
 ```
 
