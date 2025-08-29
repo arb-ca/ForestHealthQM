@@ -16,11 +16,13 @@ format:
 ```{r, include = F}
 # load libraries
 library(terra) # for handling spatial data
-library(dplyr) # for data manipulation
+library(tidyverse) # for data manipulation
 library(readxl) # for reading excel workbooks
 library(sf)
 library(writexl)
 library(ggplot2)
+library(gganimate)
+library(flextable)
 ```
 
 # Setup
@@ -179,11 +181,11 @@ aoi_prep <- function(aoi, fvs_varloc, tm_rast) {
 ```
 
 # Loop across all shapefiles in a path
-## For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
+
+For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
 ```{r}
 map_list <- list()
-
-
+treemap_areas_list <- list()
 for (i in 1:length(shp_list)) {
   print(i)
   shp <- shp_list[[i]]
@@ -230,11 +232,35 @@ for (i in 1:length(shp_list)) {
   # Write results to table and to shapefile
   file_name <- paste(output_dir, "/", base_name, "_areas_TM.xlsx", sep = "")
   write_xlsx(intersected, file_name)
+  
+  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
 
-# Plot each treatment individually
+
+# Find TreeMap acres for each polygon
+
+This is the acreage of the polygon that excludes non-forested pixels
+
+```{r}
+treemap_areas_list <- tibble(
+  Name = names(treemap_areas_list),
+  Value = unlist(treemap_areas_list)
+) 
+
+treemap_areas_list <- treemap_areas_list %>% 
+  mutate(Value = round(Value)) %>% 
+  rename("TreeMap Acres" = Value) %>% 
+  rename(Shapefile = Name)
+
+# Print a pretty table
+flextable(treemap_areas_list)
+```
+
+# Maps & Overlaps
+
+## Plot each treatment individually
 ```{r}
 for (i in seq_along(map_list)) {
   print(names(map_list)[i])
@@ -242,24 +268,105 @@ for (i in seq_along(map_list)) {
 }
 ```
 
+## Plot all treatments and highlight overlaps
+```{r}
 
-# plot the project in California to check fVs variant selection
+combined <- lapply(seq_along(shp_list), function(i) {
+  map <- shp_list[[i]]
+  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
+  map
+}) |> bind_rows()
+
+# Ensure valid geometries
+combined <- st_make_valid(combined %>% st_zm)
+
+# Find overlapping areas
+overlaps <- st_intersection(combined) %>%
+  filter(n.overlaps > 1) %>%  # Keep only actual overlaps
+  mutate(Name = "Overlap")
+
+plot_data <- bind_rows(combined, overlaps)
+
+ggplot() +
+  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
+  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "All TCNs -- Overlaps are Black",
+       fill = "TCN", 
+       col = "TCN")
+```
+
+## List overlapping pairs
+```{r}
+# Create a pairwise intersection matrix
+overlap_list <- st_intersects(combined, sparse = F)
+rownames(overlap_list) <- combined$TCN
+colnames(overlap_list) <- combined$TCN
+diag(overlap_list) <- FALSE
+print("Matrix of overlapping TCNs:")
+print(overlap_list)
+# Find positions of FALSE values
+true_positions <- which(overlap_list == TRUE, arr.ind = TRUE)
+
+# Add row and column names
+result <- data.frame(
+  Row = rownames(overlap_list)[true_positions[, 1]],
+  Column = colnames(overlap_list)[true_positions[, 2]]
+)
+
+# Create a consistent ordering for each pair
+result$pair_id <- apply(result, 1, function(x) paste(sort(x), collapse = "/"))
+# Keep only unique pairs
+unique_df <- result[!duplicated(result$pair_id), c("Row", "Column")]
+print(unique_df)
+for(i in 1:nrow(unique_df)){
+  print(paste(unique_df[i, 1], "overlaps with", unique_df[i, 2]))
+}
+```
+
+## Plot only treatments that overlap
+```{r}
+combined <- lapply(seq_along(shp_list), function(i) {
+  map <- shp_list[[i]]
+  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
+  map
+}) |> bind_rows()
+
+# Ensure valid geometries
+combined <- st_make_valid(combined %>% st_zm)
+
+# Find overlapping areas
+overlaps <- st_intersection(combined) %>%
+  filter(n.overlaps > 1) %>%  # Keep only actual overlaps
+  mutate(Name = "Overlap")
+
+plot_data <- bind_rows(combined, overlaps)
+
+combined <- combined %>% 
+  filter(TCN %in% unique_df$Row | TCN %in% unique_df$Column)
+
+ggplot() +
+  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
+  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Only overlapping TCNs -- Overlaps are Black",
+       fill = "TCN", 
+       col = "TCN")
+```
+
+## Plot the project in California to check FVS variant selection
 ```{r}
 ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
 ```
 
-# Plot treatments with FVS variants
 ```{r}
 fvs_varloc <- fvs_varloc %>% 
   filter(FVSVariant %in% c("WS", "NC", "CA", "SO")) %>% 
   group_by(FVSVariant) |>
   summarise(geometry = st_union(geometry), .groups = "drop")
-
 ```
 
-
 ```{r}
-
 centroids <- st_centroid(shp %>% st_zm())
 circle_buffer <- st_buffer(centroids, dist = 8000)
 
