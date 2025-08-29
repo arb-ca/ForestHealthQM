@@ -62,7 +62,29 @@ ggplot(df_means) +
 
 ```{r}
 ggplot(df %>% filter(MgmtID == "BSWF"))+
-  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))
+  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+  labs(
+    y = "Live Aboveground Carbon (C)") +
+  
+  ggtitle("BSWF")
+```
+
+```{r}
+ggplot(df %>% filter(MgmtID == "TRWF"))+
+  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+  labs(
+    y = "Live Aboveground Carbon (C)") +
+  
+  ggtitle("TRWF")
+```
+
+```{r}
+ggplot(df %>% filter(MgmtID == "TRNF"))+
+  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+  labs(
+    y = "Live Aboveground Carbon (C)") +
+  
+  ggtitle("TRNF")
 ```
 
 
