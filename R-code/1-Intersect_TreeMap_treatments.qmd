@@ -10,7 +10,7 @@ format:
 
 # Files needed:
 -  TreeMap datasets, clipped to CA (.tif for each year)
--  A directory with treatment shapefiles within it (can be in nested folders)
+-  A directory with treatment shapefiles within it (can be in nested/zipped folders)
 -  The FVS variants and locations shapefile
 
 ```{r, include = F}
@@ -186,6 +186,7 @@ For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that 
 ```{r}
 map_list <- list()
 treemap_areas_list <- list()
+shp_areas_list <- list()
 for (i in 1:length(shp_list)) {
   print(i)
   shp <- shp_list[[i]]
@@ -234,28 +235,42 @@ for (i in 1:length(shp_list)) {
   write_xlsx(intersected, file_name)
   
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
+  shp_areas_list[[base_name]] <- st_area(shp)
+  
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
 
 
-# Find TreeMap acres for each polygon
+# Find TreeMap acres for each polygon as a percentage of total shapefile area
 
-This is the acreage of the polygon that excludes non-forested pixels
-
+Treemap acres = the acreage of the polygon that excludes non-forested pixels
 ```{r}
-treemap_areas_list <- tibble(
+treemap_areas_df<- tibble(
   Name = names(treemap_areas_list),
   Value = unlist(treemap_areas_list)
 ) 
 
-treemap_areas_list <- treemap_areas_list %>% 
+treemap_areas_df <- treemap_areas_df %>% 
   mutate(Value = round(Value)) %>% 
   rename("TreeMap Acres" = Value) %>% 
   rename(Shapefile = Name)
 
+shp_areas_df <- tibble(
+  Name = names(shp_areas_list),
+  Value = unlist(shp_areas_list)
+) 
+
+shp_areas_df <- shp_areas_df %>% 
+  mutate(Value = Value/4046.86) %>% 
+  mutate(Value = round(Value)) %>% 
+  rename("Shapefile Acres" = Value) %>% 
+  rename(Shapefile = Name)
+
+areas_table <- full_join(treemap_areas_df, shp_areas_df) %>% 
+  mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1))
 # Print a pretty table
-flextable(treemap_areas_list)
+flextable(areas_table)
 ```
 
 # Maps & Overlaps
