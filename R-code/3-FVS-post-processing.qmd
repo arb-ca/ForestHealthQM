@@ -28,12 +28,12 @@ areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/areas"
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/57520486_FR1.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG24601_fr5_carbon.xlsx"))
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/57520486_4_20240115_areas_TM.xlsx"))
+areas <- read_excel(paste0(areas_dir, "/71399131_6_1_20250110_region_areas_TM.xlsx"))
 ```
 
 # Delete non-forested stands & mutate stand ID to match FVS output format
@@ -121,6 +121,12 @@ for (name in df_list) {
    
   df_i <- left_join(df_i, areas, join_by(StandID==Stand_ID))
   
+  if (any(is.na(df_i$TM_ID))) {
+    message("ERROR: The TM_ID column in the FVS output file and the areas file don't match.")
+    message("Are you using the right areas file?")
+    next()
+  } 
+
   # Create a new column, e.g. "Biomass_Area"
   df_i <- df_i%>% 
     mutate(Total_C = (Aboveground_Total_Live + Belowground_Live) * area_ac)
