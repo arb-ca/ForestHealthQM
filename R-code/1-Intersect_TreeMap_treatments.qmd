@@ -342,15 +342,6 @@ for(i in 1:nrow(unique_df)){
 
 ## Plot only treatments that overlap
 ```{r}
-combined <- lapply(seq_along(shp_list), function(i) {
-  map <- shp_list[[i]]
-  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  map
-}) |> bind_rows()
-
-# Ensure valid geometries
-combined <- st_make_valid(combined %>% st_zm)
-
 # Find overlapping areas
 overlaps <- st_intersection(combined) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
@@ -358,11 +349,11 @@ overlaps <- st_intersection(combined) %>%
 
 plot_data <- bind_rows(combined, overlaps)
 
-combined <- combined %>% 
+combined_overlap <- combined %>% 
   filter(TCN %in% unique_df$Row | TCN %in% unique_df$Column)
 
 ggplot() +
-  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
+  geom_sf(data = combined_overlap, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
   geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
   theme_minimal() +
   labs(title = "Only overlapping TCNs -- Overlaps are Black",

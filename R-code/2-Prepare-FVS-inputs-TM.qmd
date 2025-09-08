@@ -35,7 +35,7 @@ tm_year <- 2022 # Options = 2016, 2020, 2022
 
 ## Define the name of the project
 ```{r}
-proj_name <- "8GG23602_Sierra_Foothill_Conservancy"
+proj_name <- "Lake_County_Wildfire_Resilience_Phase3"
 ```
 
 # Load output of Step 1
@@ -99,15 +99,16 @@ tm_trees <- tm_trees %>%
 ```
 
 Notes on the issue with NA values of TPA_UNADJ:
-  - FIA STATUSCD=2 means that tree is dead 
-  - FVS HISTORY codes 1-5 mean tree is alive
-      - FVS codes 6 and 8 mean tree is dead
-  - in the LEMMA workflow, we only used History codes 1, 6, and 8. 
-  - in the LEMMA workflow, all trees had values for DBH and Ht
-  - in tm_trees,the only status codes are 1 and 2 (alive or dead)
-  - in tm_trees, all the trees with NA TPA_UNADJ are STATUSCD = 2 (dead), but not all dead trees have TPA_UNADJ = NA
-  - in tm_trees, 5% of total records have NA values of TPA_UNADJ, After removing trees with NA diameter and height, 1.5% of records have NA for TPA_UNADJ
-  
+    
+    - FIA STATUSCD=2 means that tree is dead 
+    - FVS HISTORY codes 1-5 mean tree is alive
+        - FVS codes 6 and 8 mean tree is dead
+    - in the LEMMA workflow, we only used History codes 1, 6, and 8. 
+    - in the LEMMA workflow, all trees had values for DBH and Ht
+    - in tm_trees,the only status codes are 1 and 2 (alive or dead)
+    - in tm_trees, all the trees with NA TPA_UNADJ are STATUSCD = 2 (dead), but not all dead trees have TPA_UNADJ = NA
+    - in tm_trees, 5% of total records have NA values of TPA_UNADJ, After removing trees with NA diameter and height, 1.5% of records have NA for TPA_UNADJ
+    
 ## Remove trees without DIA and Ht values
 ```{r}
 tm_trees <- tm_trees %>% 
