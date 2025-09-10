@@ -1,5 +1,5 @@
 ---
-title: "3. Calculate carbon results from FVS output"
+title: "3. Calculate carbon results from FVS output - Fuels Reduction"
 author: "Carmen Tubbesing"
 date: "`r Sys.Date()`"
 format: 
