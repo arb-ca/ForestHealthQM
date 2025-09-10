@@ -1,0 +1,92 @@
+---
+title: "5. Calculate carbon results from FVS output - Reforestation"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This run is for project `Lake County Wildfire Resilience Phase 3`
+## TCN = `1.1`
+## Shapefile = `71625010_1_1_20250114.shp`
+
+# Setup
+```{r, include = F}
+require(tidyverse)
+require(readxl)
+require(ggplot2)
+```
+
+## Define folder where the FVS outputs are located
+*Note:* Replace this for the file folder on your computer
+```{r}
+fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
+areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
+```
+
+## Load the FVS output files
+```{r}
+df <- read_excel(paste0(fvs_output_dir, "/8GG24601_1.xlsx"))
+```
+
+## Load the data tables with areas
+```{r}
+areas <- read_excel(paste0(areas_dir, "/71625010_1_1_20250114_areas_TM.xlsx"))
+```
+
+# Delete non-forested stands & mutate stand ID to match FVS output format
+```{r}
+areas <- areas %>% 
+  filter(TM_ID > 0) %>% 
+  mutate(Stand_ID = as.character(TM_ID))
+```
+
+```{r}
+df_means <- df %>% 
+  group_by(Year) %>% 
+  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live)) 
+df_means <- df_means %>% 
+  ungroup()
+```
+
+
+```{r}
+ggplot(df_means) +
+  geom_point(aes(x = Year, y = Aboveground_Total_Live)) +
+  labs(
+    y = "Live Aboveground Carbon (C)") +
+  theme_minimal()
+```
+
+
+# Filter to last year of project
+```{r}
+df <- df %>% 
+  filter(Year == max(df$Year))
+```
+
+# Merge with areas from pre-FVS files and calculate results
+-  Calculate total ending year carbon for each scenario
+-  Print results in the order they appear in `FRM_Calculator_Tool`
+```{r}
+
+ 
+df <- left_join(df, areas, join_by(StandID==Stand_ID))
+
+if (any(is.na(df$TM_ID))) {
+  message("ERROR: The TM_ID column in the FVS output file and the areas file don't match.")
+  message("Are you using the right areas file?")
+} 
+
+# Create a new column, e.g. "Biomass_Area"
+df <- df%>% 
+  mutate(Total_C = (Aboveground_Total_Live + Belowground_Live) * area_ac)
+
+# Sum carbon and label it
+sum <- sum(df$Total_C)
+
+print(paste("total C =", round(sum, 0), "MTC"))
+```
+
