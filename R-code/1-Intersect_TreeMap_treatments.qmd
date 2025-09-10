@@ -191,6 +191,7 @@ For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that 
 map_list <- list()
 treemap_areas_list <- list()
 shp_areas_list <- list()
+TCN_list <- list()
 for (i in 1:length(shp_list)) {
   print(i)
   shp <- shp_list[[i]]
@@ -240,7 +241,10 @@ for (i in 1:length(shp_list)) {
   
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
   shp_areas_list[[base_name]] <- st_area(shp)
-  
+  if("Tcn" %in% names(shp)){
+    names(shp)[names(shp) == "Tcn"] <- toupper("Tcn")
+  }
+  TCN_list[[base_name]] <- shp$TCN
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
@@ -265,13 +269,20 @@ shp_areas_df <- tibble(
   Value = unlist(shp_areas_list)
 ) 
 
+tcn_df <- tibble(
+  Shapefile = names(TCN_list),
+  TCN = unlist(TCN_list)
+)
+
 shp_areas_df <- shp_areas_df %>% 
   mutate(Value = Value/4046.86) %>% 
   mutate(Value = round(Value)) %>% 
   rename("Shapefile Acres" = Value) %>% 
   rename(Shapefile = Name)
 
-areas_table <- full_join(treemap_areas_df, shp_areas_df) %>% 
+shp_areas_df <- full_join(tcn_df, shp_areas_df)
+
+areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1))
 # Print a pretty table
 flextable(areas_table)
@@ -397,8 +408,6 @@ for (i in seq_along(map_list2)) {
   print(map_list2[[i]])
 }
 ```
-
-
 
 ## Plot the project in California to check FVS variant selection
 ```{r}
