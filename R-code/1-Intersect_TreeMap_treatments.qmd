@@ -8,6 +8,8 @@ format:
     toc: TRUE
 ---
 
+# This run is for project `8GG24601`
+
 # Files needed:
 -  TreeMap datasets, clipped to CA (.tif for each year)
 -  A directory with treatment shapefiles within it (can be in nested/zipped folders)
@@ -36,7 +38,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles/"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles/"
 ```
 
 ## Define directory with CA perimeter shapefile in it
@@ -296,6 +298,11 @@ combined <- lapply(seq_along(shp_list), function(i) {
 
 # Ensure valid geometries
 combined <- st_make_valid(combined %>% st_zm)
+
+# Make TCN column all caps if necessary
+if("Tcn" %in% names(combined)){
+  names(combined)[names(combined) == "Tcn"] <- toupper("Tcn")
+}
 
 # Find overlapping areas
 overlaps <- st_intersection(combined) %>%
