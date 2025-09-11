@@ -8,11 +8,16 @@ format:
     toc: TRUE
 ---
 
+## Define the name and ID number of the project
+```{r}
+proj_name <- "Lake_County_Wildfire_Resilience_Phase3"
+```
+
 ```{r}
 project_ID <- "8GG24602"
 ```
 
-# This run is for project `r project_ID`
+# This run is for project `r project_ID`, AKA `r proj_name`
 
 # Files needed:
 -  TreeMap datasets, clipped to CA (.tif for each year)
@@ -206,9 +211,7 @@ impact_area <- st_union(impact_area)
 ```{r}
 map_buffer <- ggplot() +
   geom_sf(data = merged_sf, fill = "lightblue", color = "black", alpha = 0.6) +
-  geom_sf(data = impact_area, color = "red", fill = "lightpink", size = 1, alpha = .2) +
-  labs(title = "Merged Features and Impact Area",
-       caption = "Blue = merged_sf, Red outline = impact_area")
+  geom_sf(data = impact_area, color = "red", fill = "lightpink", size = 1, alpha = .2) 
 ```
 
 ```{r}
@@ -228,7 +231,6 @@ intersected <- terra::intersect(tm_poly,ia)
 intersected_sf <- sf::st_as_sf(intersected)
 ```
 
-## Plot using ggplot2
 ```{r}
 map_raster <- ggplot(data = intersected_sf) +
   geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
@@ -240,8 +242,9 @@ map_raster <- ggplot(data = intersected_sf) +
 grid.arrange(map_buffer, map_raster, ncol = 2)
 ```
 
-Note: These maps use different projections
+*Note*: These maps use different projections
 
+## Save prepped rasters for impact area
 ```{r}
 # Remove columns
 intersected_sf <- intersected_sf %>% 
@@ -251,7 +254,6 @@ intersected <- intersected_sf %>%
   mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
   mutate(area_ac = area_m/4046.8726098743) %>% 
   st_drop_geometry()
-intersected %>% head()
 
 # Write results to table and to shapefile
 file_name <- paste(output_dir, "/", project_ID, "_Impact_areas.xlsx", sep = "")
@@ -330,8 +332,6 @@ for (i in 1:length(shp_list)) {
 }
 ```
 
-
-
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
@@ -372,17 +372,8 @@ flextable(areas_table)
 
 # Maps & Overlaps
 
-## Plot each treatment individually
+## Plot all treatments together and highlight overlaps
 ```{r}
-for (i in seq_along(map_list)) {
-  print(names(map_list)[i])
-  print(map_list[[i]])
-}
-```
-
-## Plot all treatments and highlight overlaps
-```{r}
-
 combined <- lapply(seq_along(shp_list), function(i) {
   map <- shp_list[[i]]
   map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
@@ -403,7 +394,9 @@ overlaps <- st_intersection(combined) %>%
   mutate(Name = "Overlap")
 
 plot_data <- bind_rows(combined, overlaps)
+```
 
+```{r, out.width="100%", fig.height=16}
 ggplot() +
   geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
   geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
@@ -411,6 +404,15 @@ ggplot() +
   labs(title = "All TCNs -- Overlaps are Black",
        fill = "TCN", 
        col = "TCN")
+```
+
+
+## Plot each treatment separately
+```{r}
+for (i in seq_along(map_list)) {
+  print(names(map_list)[i])
+  print(map_list[[i]])
+}
 ```
 
 ## List overlapping pairs
@@ -439,28 +441,22 @@ for(i in 1:nrow(unique_df)){
 }
 ```
 
-## Plot only treatments that overlap
+
 ```{r}
 # Find overlapping areas
 overlaps <- st_intersection(combined) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
   mutate(Name = "Overlap")
 
-plot_data <- bind_rows(combined, overlaps)
+# plot_data <- bind_rows(combined, overlaps)
+# 
+# combined_overlap <- combined %>% 
+#   filter(TCN %in% unique_df$Row | TCN %in% unique_df$Column)
+# 
 
-combined_overlap <- combined %>% 
-  filter(TCN %in% unique_df$Row | TCN %in% unique_df$Column)
-
-ggplot() +
-  geom_sf(data = combined_overlap, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
-  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
-  theme_minimal() +
-  labs(title = "Only overlapping TCNs -- Overlaps are Black",
-       fill = "TCN", 
-       col = "TCN")
 ```
 
-# Plot each treatment group (e.g. 1.1 and 1.2) together
+## Plot each treatment group (e.g. 1.1 and 1.2) together, with overlaps
 ```{r}
 combined$treatment_group <- sub("\\..*", "", combined$TCN)
 overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
