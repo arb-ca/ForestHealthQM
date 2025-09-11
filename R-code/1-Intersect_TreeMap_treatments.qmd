@@ -8,7 +8,11 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `8GG24601`
+```{r}
+project_ID <- "8GG24602"
+```
+
+# This run is for project `r project_ID`
 
 # Files needed:
 -  TreeMap datasets, clipped to CA (.tif for each year)
@@ -25,6 +29,7 @@ library(writexl)
 library(ggplot2)
 library(gganimate)
 library(flextable)
+library(gridExtra)
 ```
 
 # Setup
@@ -38,7 +43,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles/"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles/"
 ```
 
 ## Define directory with CA perimeter shapefile in it
@@ -103,7 +108,6 @@ for (zip_file in zip_files) {
 print("All files have been extracted.")
 ```
 
-
 # List shapefiles in dir,  ignoring those with "buffer" or "boundary" in the name
 ```{r}
 shapefiles <- list.files(
@@ -140,8 +144,6 @@ shp_list <- list()
 for(i in 1:length(shapefiles)){
   shp <- st_read(shapefiles[i], quiet= T)
   shp_list[[i]] <- shp
-  # Name each item in shp_list according to the file
-  
 }
 ```
 
@@ -149,6 +151,12 @@ for(i in 1:length(shapefiles)){
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
 ```
 
+# Prep `fvs_varloc`
+```{r}
+fvs_varloc <- st_transform(fvs_varloc, crs= 4326)
+fvs_varloc <- vect(fvs_varloc)
+fvs_varloc <- makeValid(fvs_varloc)
+```
 
 # Define functions
 
@@ -161,30 +169,103 @@ aoi_prep <- function(aoi, fvs_varloc, tm_rast) {
   #' @return A new AOI with a single polygon for each original polygon-FVSVarLoc combination,
   #' projected to match the projection of the TreeMap raster and includes lat/long of each polygon 
   #' centroid, a STAND_ID, and acres per polygon
-    aoi <- st_transform(aoi, crs = 4326)
-    aoi <- vect(aoi)
-    aoi <- makeValid(aoi)
-    fvs_varloc <- st_transform(fvs_varloc, crs= 4326)
-    fvs_varloc <- vect(fvs_varloc)
-    fvs_varloc <- makeValid(fvs_varloc)
-    single_part_polygons <- disagg(aoi) #aoi multipart polygon to single part
-    aoi_varlocs <- crop(fvs_varloc, single_part_polygons) # crop FVS varloc to the AOI single part polygons
-    aoi_varlocs$STAND_ID <- 1:nrow(aoi_varlocs) #assign a STAND_ID to each polygon record
-    aoi_centroids <- centroids(aoi_varlocs, TRUE) #create centroids spatvector
-    coords_df <- crds(aoi_centroids, df = TRUE) #convert centroids spatvector to df
-    colnames(coords_df) <- c("Longitude", "Latitude") #rename columns of centroids df
-    aoi_varlocs <- cbind(aoi_varlocs, coords_df) #column bind the centroids df to the aoi spatvector
-    # In order to convert aoi_varlocs to the crs of TreeMap, I have to convert it into an sf object and back
-    aoi_varlocs <- st_as_sf(aoi_varlocs) #convert to sf object
-    aoi_proj <- st_transform(aoi_varlocs, crs(tm_rast))
-    # Calculate area of each item in aoi_proj
-    aoi_proj$area <- st_area(aoi_proj)
-    aoi_proj <- vect(aoi_proj)
-    return(aoi_proj)
+  aoi <- st_zm(aoi)
+  aoi <- st_transform(aoi, crs = 4326)
+  aoi <- vect(aoi)
+  aoi <- makeValid(aoi)
+
+  single_part_polygons <- disagg(aoi) #aoi multipart polygon to single part
+  aoi_varlocs <- crop(fvs_varloc, single_part_polygons) # crop FVS varloc to the AOI single part polygons
+  aoi_varlocs$STAND_ID <- 1:nrow(aoi_varlocs) #assign a STAND_ID to each polygon record
+  aoi_centroids <- centroids(aoi_varlocs, TRUE) #create centroids spatvector
+  coords_df <- crds(aoi_centroids, df = TRUE) #convert centroids spatvector to df
+  colnames(coords_df) <- c("Longitude", "Latitude") #rename columns of centroids df
+  aoi_varlocs <- cbind(aoi_varlocs, coords_df) #column bind the centroids df to the aoi spatvector
+  # In order to convert aoi_varlocs to the crs of TreeMap, I have to convert it into an sf object and back
+  aoi_varlocs <- st_as_sf(aoi_varlocs) #convert to sf object
+  aoi_proj <- st_transform(aoi_varlocs, crs(tm_rast))
+  # Calculate area of each item in aoi_proj
+  aoi_proj$area <- st_area(aoi_proj)
+  aoi_proj <- vect(aoi_proj)
+  return(aoi_proj)
 }
 ```
 
-# Loop across all shapefiles in a path
+# Create impact area areas file
+
+## Merge the shapefiles into one big polygon, then buffer, then dissolve
+```{r}
+shp_list <- lapply(shp_list, st_zm)
+shp_list_valid <- lapply(shp_list, st_make_valid)
+merged_sf <- bind_rows(shp_list)
+impact_area <- st_buffer(merged_sf, dist = 1500)
+impact_area <- st_union(impact_area)
+```
+
+## Map it 
+```{r}
+map_buffer <- ggplot() +
+  geom_sf(data = merged_sf, fill = "lightblue", color = "black", alpha = 0.6) +
+  geom_sf(data = impact_area, color = "red", fill = "lightpink", size = 1, alpha = .2) +
+  labs(title = "Merged Features and Impact Area",
+       caption = "Blue = merged_sf, Red outline = impact_area")
+```
+
+```{r}
+ia <- aoi_prep(aoi = impact_area, 
+           fvs_varloc = fvs_varloc,
+           tm_rast = tmrast)
+# Clip, mask, and convert to polygons
+tm_poly <- crop(tmrast, ia) %>% 
+  mask(ia) %>% 
+  as.polygons %>% 
+  makeValid()
+
+# Intersect
+intersected <- terra::intersect(tm_poly,ia)
+
+# convert intersected to sf 
+intersected_sf <- sf::st_as_sf(intersected)
+```
+
+## Plot using ggplot2
+```{r}
+map_raster <- ggplot(data = intersected_sf) +
+  geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
+  labs(fill = "TreeMapper ID (TM_ID)")+
+  theme(legend.position = "none")
+```
+
+```{r}
+grid.arrange(map_buffer, map_raster, ncol = 2)
+```
+
+Note: These maps use different projections
+
+```{r}
+# Remove columns
+intersected_sf <- intersected_sf %>% 
+  select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
+# Calculate areas
+intersected <- intersected_sf %>% 
+  mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
+  mutate(area_ac = area_m/4046.8726098743) %>% 
+  st_drop_geometry()
+intersected %>% head()
+
+# Write results to table and to shapefile
+file_name <- paste(output_dir, "/", project_ID, "_Impact_areas.xlsx", sep = "")
+write_xlsx(intersected, file_name)
+
+st_write(intersected_sf, output_dir, paste("intersected", project_ID, "Impact_Area", sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+```
+
+# Crop treemap to size of the impact area to reduce computing time for the rest of the script
+```{r}
+tmrast <- crop(tmrast, ia)
+```
+
+# Loop the areas file prep across all shapefiles in a path
 
 For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
 ```{r}
@@ -220,7 +301,7 @@ for (i in 1:length(shp_list)) {
   # Plot using ggplot2
   map_name <- paste("map", base_name, sep = "_")
   map <- ggplot(data = intersected_sf) +
-    geom_sf(aes(fill = as.factor(TM_ID), color = NA)) +
+    geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
     labs(fill = "TreeMapper ID (TM_ID)")+
     theme(legend.position = "none")+
     geom_sf(data = shp, fill = NA)
@@ -248,6 +329,7 @@ for (i in 1:length(shp_list)) {
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
+
 
 
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
@@ -338,8 +420,7 @@ overlap_list <- st_intersects(combined, sparse = F)
 rownames(overlap_list) <- combined$TCN
 colnames(overlap_list) <- combined$TCN
 diag(overlap_list) <- FALSE
-print("Matrix of overlapping TCNs:")
-print(overlap_list)
+
 # Find positions of FALSE values
 true_positions <- which(overlap_list == TRUE, arr.ind = TRUE)
 
@@ -415,7 +496,7 @@ ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
 ```
 
 ```{r}
-fvs_varloc <- fvs_varloc %>% 
+fvs_varloc <- st_as_sf(fvs_varloc) %>% 
   filter(FVSVariant %in% c("WS", "NC", "CA", "SO")) %>% 
   group_by(FVSVariant) |>
   summarise(geometry = st_union(geometry), .groups = "drop")
