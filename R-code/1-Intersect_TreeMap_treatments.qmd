@@ -17,6 +17,12 @@ proj_name <- "Lake_County_Wildfire_Resilience_Phase3"
 project_ID <- "8GG24602"
 ```
 
+## Define impact area buffer distance, in meters
+```{r}
+buffer_dist <- 1500
+```
+
+
 # This run is for project `r project_ID`, AKA `r proj_name`
 
 # Files needed:
@@ -25,16 +31,27 @@ project_ID <- "8GG24602"
 -  The FVS variants and locations shapefile
 
 ```{r, include = F}
-# load libraries
-library(terra) # for handling spatial data
-library(tidyverse) # for data manipulation
-library(readxl) # for reading excel workbooks
-library(sf)
-library(writexl)
-library(ggplot2)
-library(gganimate)
-library(flextable)
-library(gridExtra)
+# List of required packages
+required_packages <- c(
+  "terra",       
+  "tidyverse",   
+  "readxl",      
+  "sf",
+  "writexl",
+  "ggplot2",
+  "flextable",
+  "gridExtra"
+)
+
+# Install missing packages
+missing_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+
+if (length(missing_packages)>0) {
+  install.packages(missing_packages)
+}
+
+# Load all packages
+lapply(required_packages, require, character.only = TRUE)
 ```
 
 # Setup
@@ -202,7 +219,7 @@ aoi_prep <- function(aoi, fvs_varloc, tm_rast) {
 shp_list <- lapply(shp_list, st_zm)
 shp_list_valid <- lapply(shp_list, st_make_valid)
 merged_sf <- bind_rows(shp_list)
-impact_area <- st_buffer(merged_sf, dist = 1500)
+impact_area <- st_buffer(merged_sf, dist = buffer_dist)
 impact_area <- st_union(impact_area)
 ```
 
@@ -274,7 +291,7 @@ tmrast <- crop(tmrast, ia)
 ```{r}
 trt_sf <- st_union(merged_sf)
 trt_string <- paste(project_ID, "trt", sep = "_")
-st_write(intersected_sf, output_dir_randig, trt_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+st_write(trt_sf, output_dir_randig, trt_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 ```
 
 ### Zip 
