@@ -56,11 +56,11 @@ trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shap
 ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
 ```
 
-
 ## Define input and output dir
 ```{r}
 input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
 output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
+output_dir_randig <- "~/../../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
 ```
 
 ## Define FVS variant location shapefile
@@ -73,7 +73,6 @@ fvs_varloc <- st_read(fvs_varloc_shp_path, )
 ```{r}
 unlink(paste0(output_dir, "/*"), recursive = TRUE)
 ```
-
 
 ## Read in TreeMap dataset(s)
 
@@ -266,6 +265,45 @@ st_write(intersected_sf, output_dir, paste("intersected", project_ID, "Impact_Ar
 ```{r}
 tmrast <- crop(tmrast, ia)
 ```
+
+# Save shapefiles of all shapefiles and treatment area for use in impact area app
+
+## Treatments
+
+### Write
+```{r}
+trt_sf <- st_union(merged_sf)
+trt_string <- paste(project_ID, "trt", sep = "_")
+st_write(intersected_sf, output_dir_randig, trt_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+```
+
+### Zip 
+```{r}
+# Find all files with "_trt" in the name
+files_to_zip <- list.files(path = output_dir_randig, trt_string, full.names = TRUE)
+# Create the zip 
+zip(zipfile = paste0(output_dir_randig, "/", trt_string, ".zip"), files = files_to_zip)
+```
+
+## Impact area
+```{r}
+ia_string <- paste(project_ID, "ia", sep = "_")
+```
+
+### Write
+```{r}
+st_write(impact_area, output_dir_randig, ia_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+```
+
+### Zip
+```{r}
+# Find all files with "_ia" in the name
+files_to_zip <- list.files(path = output_dir_randig, ia_string, full.names = TRUE)
+# Create the zip 
+zip(zipfile = paste0(output_dir_randig, "/", ia_string, ".zip"), files = files_to_zip)
+```
+
+
 
 # Loop the areas file prep across all shapefiles in a path
 
