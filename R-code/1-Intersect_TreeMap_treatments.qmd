@@ -10,11 +10,11 @@ format:
 
 ## Define the name and ID number of the project
 ```{r}
-proj_name <- "Lake_County_Wildfire_Resilience_Phase3"
+proj_name <- "Butte Creek - Buck Mountain Forest Health Project"
 ```
 
 ```{r}
-project_ID <- "8GG24602"
+project_ID <- "8GG24601"
 ```
 
 ## Define impact area buffer distance, in meters
@@ -65,7 +65,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles/"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles/"
 ```
 
 ## Define directory with CA perimeter shapefile in it
@@ -83,7 +83,7 @@ output_dir_randig <- "~/../../Data_heavy_projects/Forest_QM_automation/randig_sh
 ## Define FVS variant location shapefile
 ```{r}
 fvs_varloc_shp_path <- file.path(input_dir, "../../FVS_files/FVSVariantMap20210525/FVS_Variants_and_Locations.shp")
-fvs_varloc <- st_read(fvs_varloc_shp_path, )
+fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 ```
 
 ## Clear output directory (`temp`)
@@ -129,7 +129,7 @@ for (zip_file in zip_files) {
 print("All files have been extracted.")
 ```
 
-# List shapefiles in dir,  ignoring those with "buffer" or "boundary" in the name
+# List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
 ```{r}
 shapefiles <- list.files(
   path = trt_dir,
@@ -283,12 +283,13 @@ st_write(intersected_sf, output_dir, paste("intersected", project_ID, "Impact_Ar
 tmrast <- crop(tmrast, ia)
 ```
 
-# Save shapefiles of all shapefiles and treatment area for use in impact area app
+# Save shapefiles for use in impact area app
 
 ## Treatments
 
 ### Write
 ```{r}
+merged_sf <- st_make_valid(merged_sf)
 trt_sf <- st_union(merged_sf)
 trt_string <- paste(project_ID, "trt", sep = "_")
 st_write(trt_sf, output_dir_randig, trt_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
@@ -319,7 +320,6 @@ files_to_zip <- list.files(path = output_dir_randig, ia_string, full.names = TRU
 # Create the zip 
 zip(zipfile = paste0(output_dir_randig, "/", ia_string, ".zip"), files = files_to_zip)
 ```
-
 
 
 # Loop the areas file prep across all shapefiles in a path
@@ -454,9 +454,9 @@ plot_data <- bind_rows(combined, overlaps)
 ```{r, out.width="100%", fig.height=16}
 ggplot() +
   geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
-  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.6) +
+  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
   theme_minimal() +
-  labs(title = "All TCNs -- Overlaps are Black",
+  labs(title = "All TCNs -- Overlaps are darkened",
        fill = "TCN", 
        col = "TCN")
 ```
@@ -529,7 +529,7 @@ for(i in treatment_groups){
     geom_sf(data = combined_i, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
     geom_sf(data = overlaps_i, fill = "black", color = "black", alpha = 0.6) +
     theme_minimal() +
-    labs(title = paste0("Treatment group ", i ,", Black is overlap"),
+    labs(title = paste0("Treatment group ", i ,", Dark is overlap"),
          fill = "TCN", 
          col = "TCN")
   map_name <- paste("Treatment_group", i, sep = "_")
