@@ -22,6 +22,11 @@ project_ID <- "8GG24601"
 buffer_dist <- 1500
 ```
 
+# Define which treatments are reforestation or biomass utilization. These do not require FVS inputs.
+```{r}
+noFVS <- c(7.1, 5.1)
+```
+
 
 # This run is for project `r project_ID`, AKA `r proj_name`
 
@@ -144,22 +149,8 @@ shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
 basename(shapefiles)
 ```
 
-# If shapefile is multi-part, break it up by Grant ID #
-```{r}
-shp_list <- list()
-for(i in 1:length(shapefiles)){
-  shp <- st_read(shapefiles[i], quiet= T)
-  if(length(shp$Grant_ID) > 1){
-    for(j in 1:length(shp$Grant_ID)){
-      shp_grant <- shp %>% 
-        filter(Grant_ID == shp$Grant_ID[j])
-      shp_list[[j]] <- shp_grant
-    }
-  }
-}
-```
 
-## Otherwise, create shp_list
+## Create shp_list
 ```{r}
 shp_list <- list()
 for(i in 1:length(shapefiles)){
@@ -212,115 +203,6 @@ aoi_prep <- function(aoi, fvs_varloc, tm_rast) {
 }
 ```
 
-# Create impact area areas file
-
-## Merge the shapefiles into one big polygon, then buffer, then dissolve
-```{r}
-shp_list <- lapply(shp_list, st_zm)
-shp_list_valid <- lapply(shp_list, st_make_valid)
-merged_sf <- bind_rows(shp_list)
-impact_area <- st_buffer(merged_sf, dist = buffer_dist)
-impact_area <- st_union(impact_area)
-```
-
-## Map it 
-```{r}
-map_buffer <- ggplot() +
-  geom_sf(data = merged_sf, fill = "lightblue", color = "black", alpha = 0.6) +
-  geom_sf(data = impact_area, color = "red", fill = "lightpink", size = 1, alpha = .2) 
-```
-
-```{r}
-ia <- aoi_prep(aoi = impact_area, 
-           fvs_varloc = fvs_varloc,
-           tm_rast = tmrast)
-# Clip, mask, and convert to polygons
-tm_poly <- crop(tmrast, ia) %>% 
-  mask(ia) %>% 
-  as.polygons %>% 
-  makeValid()
-
-# Intersect
-intersected <- terra::intersect(tm_poly,ia)
-
-# convert intersected to sf 
-intersected_sf <- sf::st_as_sf(intersected)
-```
-
-```{r}
-map_raster <- ggplot(data = intersected_sf) +
-  geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
-  labs(fill = "TreeMapper ID (TM_ID)")+
-  theme(legend.position = "none")
-```
-
-```{r}
-grid.arrange(map_buffer, map_raster, ncol = 2)
-```
-
-*Note*: These maps use different projections
-
-## Save prepped rasters for impact area
-```{r}
-# Remove columns
-intersected_sf <- intersected_sf %>% 
-  select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
-# Calculate areas
-intersected <- intersected_sf %>% 
-  mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
-  mutate(area_ac = area_m/4046.8726098743) %>% 
-  st_drop_geometry()
-
-# Write results to table and to shapefile
-file_name <- paste(output_dir, "/", project_ID, "_Impact_areas.xlsx", sep = "")
-write_xlsx(intersected, file_name)
-
-st_write(intersected_sf, output_dir, paste("intersected", project_ID, "Impact_Area", sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-```
-
-# Crop treemap to size of the impact area to reduce computing time for the rest of the script
-```{r}
-tmrast <- crop(tmrast, ia)
-```
-
-# Save shapefiles for use in impact area app
-
-## Treatments
-
-### Write
-```{r}
-merged_sf <- st_make_valid(merged_sf)
-trt_sf <- st_union(merged_sf)
-trt_string <- paste(project_ID, "trt", sep = "_")
-st_write(trt_sf, output_dir_randig, trt_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-```
-
-### Zip 
-```{r}
-# Find all files with "_trt" in the name
-files_to_zip <- list.files(path = output_dir_randig, trt_string, full.names = TRUE)
-# Create the zip 
-zip(zipfile = paste0(output_dir_randig, "/", trt_string, ".zip"), files = files_to_zip)
-```
-
-## Impact area
-```{r}
-ia_string <- paste(project_ID, "ia", sep = "_")
-```
-
-### Write
-```{r}
-st_write(impact_area, output_dir_randig, ia_string, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-```
-
-### Zip
-```{r}
-# Find all files with "_ia" in the name
-files_to_zip <- list.files(path = output_dir_randig, ia_string, full.names = TRUE)
-# Create the zip 
-zip(zipfile = paste0(output_dir_randig, "/", ia_string, ".zip"), files = files_to_zip)
-```
-
 
 # Loop the areas file prep across all shapefiles in a path
 
@@ -333,36 +215,67 @@ TCN_list <- list()
 for (i in 1:length(shp_list)) {
   print(i)
   shp <- shp_list[[i]]
-  if(length(shp$Grant_ID) > 1){
-    base_name <- paste("SB63", shp$Grant_ID, sep = "_")
-  } else{
-    base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+  if("Tcn" %in% names(shp)){
+    names(shp)[names(shp) == "Tcn"] <- toupper("Tcn")
   }
+  if(shp$TCN %in% noFVS){
+    print(paste("Skipping TCN =", shp$TCN))
+    next
+  }
+    
+  # Start with impact area
+  shp_buff <- st_buffer(shp, dist = buffer_dist)
   
-  aoi_prepped <- aoi_prep(aoi = shp, 
+  aoi_prepped_buff <- aoi_prep(aoi = shp_buff, 
            fvs_varloc = fvs_varloc,
            tm_rast = tmrast)
-  print(paste("Created aoi_prepped for", base_name))
+
   # Clip, mask, and convert to polygons
+  tm_poly_buff <- crop(tmrast, aoi_prepped_buff) %>% 
+    mask(aoi_prepped_buff) %>% 
+    as.polygons %>% 
+    makeValid()
+  # Intersect
+  intersected_buff <- terra::intersect(tm_poly_buff, aoi_prepped_buff)
+  print(paste("Created TreeMap Polygons for impact area of", base_name))
+
+  # convert intersected to sf 
+  intersected_sf_buff <- sf::st_as_sf(intersected_buff)
+  
+   
+  # Remove columns
+  intersected_sf_buff  <- intersected_sf_buff  %>% 
+    select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
+  # Calculate areas
+  intersected_buff  <- intersected_sf_buff  %>% 
+    mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
+    mutate(area_ac = area_m/4046.8726098743) %>% 
+    st_drop_geometry()
+  
+  # Write results to table and to shapefile
+  file_name <- paste(output_dir, "/", base_name, "_areas_IA.xlsx", sep = "")
+  write_xlsx(intersected_buff, file_name)
+
+  # Now do for treatment no buffer
+  
+  aoi_prepped <- aoi_prep(aoi = shp, 
+         fvs_varloc = fvs_varloc,
+         tm_rast = tmrast)
+  
+  # FIX THIS
   tm_poly <- crop(tmrast, aoi_prepped) %>% 
     mask(aoi_prepped) %>% 
     as.polygons %>% 
     makeValid()
   # Intersect
   intersected <- terra::intersect(tm_poly, aoi_prepped)
-  print(paste("Created TreeMap Polygons for", base_name))
+  print(paste("Created TreeMap Polygons for trt area of", base_name))
 
   # convert intersected to sf 
-  intersected_sf <- sf::st_as_sf(intersected)
-
-  # Plot using ggplot2
-  map_name <- paste("map", base_name, sep = "_")
-  map <- ggplot(data = intersected_sf) +
-    geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
-    labs(fill = "TreeMapper ID (TM_ID)")+
-    theme(legend.position = "none")+
-    geom_sf(data = shp, fill = NA)
-  map_list[[map_name]] <- map
+  intersected_sf<- sf::st_as_sf(intersected)
+  
+  
   
   # Remove columns
   intersected_sf <- intersected_sf %>% 
@@ -372,16 +285,23 @@ for (i in 1:length(shp_list)) {
     mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
     mutate(area_ac = area_m/4046.8726098743) %>% 
     st_drop_geometry()
-  intersected %>% head()
   # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", base_name, "_areas_TM.xlsx", sep = "")
+  file_name <- paste(output_dir, "/", base_name, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
+  
+    # Plot using ggplot2
+  map_name <- paste("map", base_name, sep = "_")
+  map <- ggplot(data = intersected_sf) +
+    geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
+    #geom_sf(data = intersected_sf_buff)+
+    labs(fill = "TreeMapper ID (TM_ID)")+
+    theme(legend.position = "none")+
+    geom_sf(data = shp, fill = NA)
+  map_list[[map_name]] <- map
   
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
   shp_areas_list[[base_name]] <- st_area(shp)
-  if("Tcn" %in% names(shp)){
-    names(shp)[names(shp) == "Tcn"] <- toupper("Tcn")
-  }
+
   TCN_list[[base_name]] <- shp$TCN
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
