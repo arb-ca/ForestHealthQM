@@ -51,6 +51,12 @@ values(r2012_updated)[values(mask_1) == 1] <- 5
 
 ```
 
+# Reproject in EPSG=3310
+```{r}
+r2012_updated <- project(r2012_updated, "EPSG:3310")
+```
+
+
 # Write to tif
 ```{r}
 # Define output path
