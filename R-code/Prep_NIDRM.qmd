@@ -1,0 +1,62 @@
+---
+title: "Prep NIDRM Data for Pest Management QM"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+# Setup
+```{r, includ = F}
+library(terra)
+```
+
+## Define paths
+```{r}
+r2012_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/NIDRM/L48_composite_hazard/composite_hazard/pct_tbaloss_CA.tif"
+raster_2018_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/NIDRM/California NIDRM/California.tif"
+
+shapefile_path <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/Reference data/CA boundary/ca-state-boundary/CA_State_TIGER2016_5070.shp"
+
+```
+
+## Load rasters
+```{r}
+r2012 <- rast(r2012_path)
+r2018 <- rast(raster_2018_path)
+
+```
+
+```{r}
+crs(r2012)==crs(r2018)
+r2012 <- project(r2012, crs(r2018))
+```
+
+```{r}
+summary(values(r2018))
+```
+
+# For pixels where r2018==1, replace the values in r2012 to 5 
+```{r}
+# Step 1: Resample r2018 to match r2012 (using nearest neighbor for categorical data)
+r2018_resampled <- resample(r2018, r2012, method = "near")
+
+# Step 2: Create a mask where r2018 == 1
+mask_1 <- r2018_resampled == 1
+
+# Step 3: Replace values in r2012 where r2018 == 1 with 5
+r2012_updated <- r2012
+values(r2012_updated)[values(mask_1) == 1] <- 5
+
+```
+
+# Write to tif
+```{r}
+# Define output path
+output_tif <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/NIDRM/NIDRM_updated.tif"
+
+# Write the raster to a .tif file
+writeRaster(r2012_updated, output_tif, filetype = "GTiff", overwrite = TRUE)
+```
+
