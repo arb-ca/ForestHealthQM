@@ -9,12 +9,13 @@ format:
 ---
 
 ## Define the name and ID number of the project
+
 ```{r}
-proj_name <- "Butte Creek - Buck Mountain Forest Health Project"
+proj_name <- "Upper Pit River Forest Health Project, Phase 2"
 ```
 
 ```{r}
-project_ID <- "8GG24601"
+project_ID <- "8GG20600"
 ```
 
 ## Define impact area buffer distance, in meters
@@ -24,16 +25,27 @@ buffer_dist <- 1500
 
 # Define which treatments are reforestation or biomass utilization. These do not require FVS inputs.
 ```{r}
-noFVS <- c(7.1, 5.1)
+noFVS <- c(0)
+```
+
+## Define which year of TreeMap you want to use
+```{r}
+tm <- 2022 # Options = 2016, 2020, 2022
+```
+
+## Define directory with treatment shapefiles in it
+```{r}
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20600/8GG20600_CloseoutShapefiles"
 ```
 
 
 # This run is for project `r project_ID`, AKA `r proj_name`
 
 # Files needed:
--  TreeMap datasets, clipped to CA (.tif for each year)
--  A directory with treatment shapefiles within it (can be in nested/zipped folders)
--  The FVS variants and locations shapefile
+
+-   TreeMap datasets, clipped to CA (.tif for each year)
+-   A directory with treatment shapefiles within it (can be in nested/zipped folders)
+-   The FVS variants and locations shapefile
 
 ```{r, include = F}
 # List of required packages
@@ -63,42 +75,33 @@ lapply(required_packages, require, character.only = TRUE)
 
 *These are the things you have to edit between runs*
 
-## Define which year of TreeMap you want to use
-```{r}
-tm <- 2022 # Options = 2016, 2020, 2022
-```
+### Define directory with CA perimeter shapefile in it
 
-## Define directory with treatment shapefiles in it
-```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles/"
-```
-
-## Define directory with CA perimeter shapefile in it
 ```{r}
 ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
 ```
 
-## Define input and output dir
+### Define input and output dir
+
 ```{r}
 input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
 output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 output_dir_randig <- "~/../../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
 ```
 
-## Define FVS variant location shapefile
+### Define FVS variant location shapefile
+
 ```{r}
 fvs_varloc_shp_path <- file.path(input_dir, "../../FVS_files/FVSVariantMap20210525/FVS_Variants_and_Locations.shp")
 fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 ```
 
-## Clear output directory (`temp`)
+### Clear output directory (`temp`)
 ```{r}
 unlink(paste0(output_dir, "/*"), recursive = TRUE)
 ```
 
-## Read in TreeMap dataset(s)
-
-### TreeMap rasters
+### Read in TreeMap dataset(s)
 ```{r}
 tm16file <- file.path(input_dir, "TreeMap2016/tm2016_ca/tm2016_ca.tif") 
 tm20file <- file.path(input_dir, "TreeMap2020/tm2020_ca/TM2020_CA.tif")
@@ -122,6 +125,7 @@ if(tm == 2016){
 ```
 
 ## If necessary, unzip treatment shapefiles
+
 ```{r}
 # List all zipped files in the Shapefiles folder
 zip_files <- list.files(trt_dir, pattern = "\\.zip$", full.names = TRUE)
@@ -135,6 +139,7 @@ print("All files have been extracted.")
 ```
 
 # List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
+
 ```{r}
 shapefiles <- list.files(
   path = trt_dir,
@@ -148,7 +153,6 @@ shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
 shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
 basename(shapefiles)
 ```
-
 
 ## Create shp_list
 ```{r}
@@ -165,85 +169,133 @@ print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list),
 
 # Prep `fvs_varloc`
 ```{r}
-fvs_varloc <- st_transform(fvs_varloc, crs= 4326)
 fvs_varloc <- vect(fvs_varloc)
 fvs_varloc <- makeValid(fvs_varloc)
+fvs_varloc <- project(fvs_varloc, crs(tmrast))
+fvs_varloc_sf <- st_as_sf(fvs_varloc)
 ```
 
-# Define functions
+# Prepare shapefiles & TreeMap raster for spatial overlay
 
-## Function for AOI prep & intersection with variant shapefile
+
+### Make sure that each shapefile has TCN variable and rename if necessary
 ```{r}
-aoi_prep <- function(aoi, fvs_varloc, tm_rast) {
+# Define possible names for the TCN column
+tcn_variants <- c("Tcn", "TreatmentC", "tcn", "treatmentc")
+
+# Function to rename the TCN column in a single sf object
+rename_tcn_column <- function(sf_obj) {
+  current_names <- names(sf_obj)
+  match_name <- current_names[current_names %in% tcn_variants]
+  if (length(match_name) == 1) {
+    names(sf_obj)[names(sf_obj) == match_name] <- "TCN"
+  }
+  return(sf_obj)
+}
+
+# Apply the function to each element in the list
+shp_list <- lapply(shp_list, rename_tcn_column)
+```
+
+```{r}
+# Define possible names for the TCN column
+Tobj_variants <- c("Tobj", "TreatmentO", "TObj")
+
+# Function to rename the TCN column in a single sf object
+rename_Tobj_column <- function(sf_obj) {
+  current_names <- names(sf_obj)
+  match_name <- current_names[current_names %in% Tobj_variants]
+  if (length(match_name) == 1) {
+    names(sf_obj)[names(sf_obj) == match_name] <- "Tobj"
+  }
+  return(sf_obj)
+}
+
+# Apply the function to each element in the list
+shp_list <- lapply(shp_list, rename_Tobj_column)
+```
+
+
+### Function for AOI prep & intersection with variant shapefile
+
+```{r}
+aoi_prep <- function(aoi) {
   #' @param aoi the AOI polygon
   #' @param fvs_varloc the FVS variants and locations shapefile
-  #' @param tm_rast the TreeMap raster
   #' @return A new AOI with a single polygon for each original polygon-FVSVarLoc combination,
-  #' projected to match the projection of the TreeMap raster and includes lat/long of each polygon 
   #' centroid, a STAND_ID, and acres per polygon
   aoi <- st_zm(aoi)
-  aoi <- st_transform(aoi, crs = 4326)
+  aoi <- st_transform(aoi, st_crs(fvs_varloc_sf))
   aoi <- vect(aoi)
   aoi <- makeValid(aoi)
 
-  single_part_polygons <- disagg(aoi) #aoi multipart polygon to single part
-  aoi_varlocs <- crop(fvs_varloc, single_part_polygons) # crop FVS varloc to the AOI single part polygons
-  aoi_varlocs$STAND_ID <- 1:nrow(aoi_varlocs) #assign a STAND_ID to each polygon record
-  aoi_centroids <- centroids(aoi_varlocs, TRUE) #create centroids spatvector
-  coords_df <- crds(aoi_centroids, df = TRUE) #convert centroids spatvector to df
-  colnames(coords_df) <- c("Longitude", "Latitude") #rename columns of centroids df
+  
+  
+  aoi_varlocs$TCN <- aoi$TCN
+  aoi_varlocs$Tobj <- aoi$Tobj
+
   aoi_varlocs <- cbind(aoi_varlocs, coords_df) #column bind the centroids df to the aoi spatvector
   # In order to convert aoi_varlocs to the crs of TreeMap, I have to convert it into an sf object and back
-  aoi_varlocs <- st_as_sf(aoi_varlocs) #convert to sf object
-  aoi_proj <- st_transform(aoi_varlocs, crs(tm_rast))
+  aoi_proj <- st_as_sf(aoi_varlocs) #convert to sf object
   # Calculate area of each item in aoi_proj
   aoi_proj$area <- st_area(aoi_proj)
-  aoi_proj <- vect(aoi_proj)
   return(aoi_proj)
 }
 ```
 
+### Apply `aoi_prep()` to each shapefile
+```{r}
+shp_list_new <- lapply(shp_list, aoi_prep) #takes a second
+```
 
-# Loop the areas file prep across all shapefiles in a path
+### Combine all shapefiles 
+```{r}
+combined <- lapply(seq_along(shp_list_new), function(i) {
+  map <- shp_list_new[[i]]
+  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
+  map$TCN <- as.character(map$TCN)
+  map
+}) |> bind_rows()
+
+# Ensure valid geometries
+combined <- st_make_valid(combined %>% st_zm)
+```
+
+
+# Loop the areas calculations across all shapefiles in a path
 
 For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
+
 ```{r}
 map_list <- list()
 treemap_areas_list <- list()
 shp_areas_list <- list()
 TCN_list <- list()
-for (i in 1:length(shp_list)) {
+for (i in 1:length(shp_list_new)) {
   print(i)
-  shp <- shp_list[[i]]
+  shp_sf <- shp_list_new[[i]]
+  shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
-  if("Tcn" %in% names(shp)){
-    names(shp)[names(shp) == "Tcn"] <- toupper("Tcn")
-  }
-  if(shp$TCN %in% noFVS){
-    print(paste("Skipping TCN =", shp$TCN))
-    next
-  }
-    
+
+  # if(shp_sf$TCN %in% noFVS){
+  #   print(paste("Skipping TCN =", shp_sf$TCN))
+  #   next
+  # }
   # Start with impact area
-  shp_buff <- st_buffer(shp, dist = buffer_dist)
-  
-  aoi_prepped_buff <- aoi_prep(aoi = shp_buff, 
-           fvs_varloc = fvs_varloc,
-           tm_rast = tmrast)
+  shp_buff <- buffer(shp, width = buffer_dist)
 
   # Clip, mask, and convert to polygons
-  tm_poly_buff <- crop(tmrast, aoi_prepped_buff) %>% 
-    mask(aoi_prepped_buff) %>% 
+  shp_buff <- project(shp_buff, crs(tmrast))
+  tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
     as.polygons %>% 
     makeValid()
   # Intersect
-  intersected_buff <- terra::intersect(tm_poly_buff, aoi_prepped_buff)
+  intersected_buff <- terra::intersect(tm_poly_buff, shp_buff)
   print(paste("Created TreeMap Polygons for impact area of", base_name))
 
   # convert intersected to sf 
   intersected_sf_buff <- sf::st_as_sf(intersected_buff)
   
-   
   # Remove columns
   intersected_sf_buff  <- intersected_sf_buff  %>% 
     select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
@@ -258,24 +310,15 @@ for (i in 1:length(shp_list)) {
   write_xlsx(intersected_buff, file_name)
 
   # Now do for treatment no buffer
-  
-  aoi_prepped <- aoi_prep(aoi = shp, 
-         fvs_varloc = fvs_varloc,
-         tm_rast = tmrast)
-  
-  # FIX THIS
-  tm_poly <- crop(tmrast, aoi_prepped) %>% 
-    mask(aoi_prepped) %>% 
+  tm_poly <- crop(tmrast, shp, mask = T) %>% 
     as.polygons %>% 
     makeValid()
   # Intersect
-  intersected <- terra::intersect(tm_poly, aoi_prepped)
+  intersected <- terra::intersect(tm_poly, shp)
   print(paste("Created TreeMap Polygons for trt area of", base_name))
 
   # convert intersected to sf 
   intersected_sf<- sf::st_as_sf(intersected)
-  
-  
   
   # Remove columns
   intersected_sf <- intersected_sf %>% 
@@ -296,13 +339,13 @@ for (i in 1:length(shp_list)) {
     #geom_sf(data = intersected_sf_buff)+
     labs(fill = "TreeMapper ID (TM_ID)")+
     theme(legend.position = "none")+
-    geom_sf(data = shp, fill = NA)
+    geom_sf(data = shp_sf, fill = NA)
   map_list[[map_name]] <- map
   
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
-  shp_areas_list[[base_name]] <- st_area(shp)
+  shp_areas_list[[base_name]] <- st_area(shp_sf)
 
-  TCN_list[[base_name]] <- shp$TCN
+  TCN_list[[base_name]] <- shp_sf$TCN
   st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
@@ -310,6 +353,7 @@ for (i in 1:length(shp_list)) {
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
+
 ```{r}
 treemap_areas_df<- tibble(
   Name = names(treemap_areas_list),
@@ -347,22 +391,8 @@ flextable(areas_table)
 
 # Maps & Overlaps
 
-## Plot all treatments together and highlight overlaps
+### Plot all treatments together and highlight overlaps
 ```{r}
-combined <- lapply(seq_along(shp_list), function(i) {
-  map <- shp_list[[i]]
-  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  map
-}) |> bind_rows()
-
-# Ensure valid geometries
-combined <- st_make_valid(combined %>% st_zm)
-
-# Make TCN column all caps if necessary
-if("Tcn" %in% names(combined)){
-  names(combined)[names(combined) == "Tcn"] <- toupper("Tcn")
-}
-
 # Find overlapping areas
 overlaps <- st_intersection(combined) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
@@ -373,7 +403,7 @@ plot_data <- bind_rows(combined, overlaps)
 
 ```{r, out.width="100%", fig.height=16}
 ggplot() +
-  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
+  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
   geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
   theme_minimal() +
   labs(title = "All TCNs -- Overlaps are darkened",
@@ -381,8 +411,8 @@ ggplot() +
        col = "TCN")
 ```
 
+### Plot each treatment separately
 
-## Plot each treatment separately
 ```{r}
 for (i in seq_along(map_list)) {
   print(names(map_list)[i])
@@ -390,7 +420,8 @@ for (i in seq_along(map_list)) {
 }
 ```
 
-## List overlapping pairs
+### List overlapping pairs
+
 ```{r}
 # Create a pairwise intersection matrix
 overlap_list <- st_intersects(combined, sparse = F)
@@ -416,22 +447,15 @@ for(i in 1:nrow(unique_df)){
 }
 ```
 
-
 ```{r}
 # Find overlapping areas
 overlaps <- st_intersection(combined) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
   mutate(Name = "Overlap")
-
-# plot_data <- bind_rows(combined, overlaps)
-# 
-# combined_overlap <- combined %>% 
-#   filter(TCN %in% unique_df$Row | TCN %in% unique_df$Column)
-# 
-
 ```
 
-## Plot each treatment group (e.g. 1.1 and 1.2) together, with overlaps
+### Plot each treatment group (e.g. 1.1 and 1.2) together, with overlaps
+
 ```{r}
 combined$treatment_group <- sub("\\..*", "", combined$TCN)
 overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
@@ -462,6 +486,7 @@ for (i in seq_along(map_list2)) {
 ```
 
 ## Plot the project in California to check FVS variant selection
+
 ```{r}
 ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
 ```
@@ -487,4 +512,3 @@ ggplot() +
 ```{r}
 print(paste("FVS Variant selection for", basename(file_name), "is", unique(intersected$FVSVariant)))
 ```
-
