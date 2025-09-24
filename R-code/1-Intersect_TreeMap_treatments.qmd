@@ -167,14 +167,6 @@ for(i in 1:length(shapefiles)){
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
 ```
 
-# Prep `fvs_varloc`
-```{r}
-fvs_varloc <- vect(fvs_varloc)
-fvs_varloc <- makeValid(fvs_varloc)
-fvs_varloc <- project(fvs_varloc, crs(tmrast))
-fvs_varloc_sf <- st_as_sf(fvs_varloc)
-```
-
 # Prepare shapefiles & TreeMap raster for spatial overlay
 
 
@@ -215,50 +207,50 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
+# Overlap treatments and FVS variants
 
-### Function for AOI prep & intersection with variant shapefile
-
+### Prep `fvs_varloc`
 ```{r}
-aoi_prep <- function(aoi) {
-  #' @param aoi the AOI polygon
-  #' @param fvs_varloc the FVS variants and locations shapefile
-  #' @return A new AOI with a single polygon for each original polygon-FVSVarLoc combination,
-  #' centroid, a STAND_ID, and acres per polygon
-  aoi <- st_zm(aoi)
-  aoi <- st_transform(aoi, st_crs(fvs_varloc_sf))
-  aoi <- vect(aoi)
-  aoi <- makeValid(aoi)
+fvs_varloc <- vect(fvs_varloc)
+fvs_varloc <- makeValid(fvs_varloc)
+fvs_varloc <- project(fvs_varloc, crs(tmrast))
+fvs_sf <- st_as_sf(fvs_varloc)
+```
 
-  
-  
-  aoi_varlocs$TCN <- aoi$TCN
-  aoi_varlocs$Tobj <- aoi$Tobj
 
-  aoi_varlocs <- cbind(aoi_varlocs, coords_df) #column bind the centroids df to the aoi spatvector
-  # In order to convert aoi_varlocs to the crs of TreeMap, I have to convert it into an sf object and back
-  aoi_proj <- st_as_sf(aoi_varlocs) #convert to sf object
-  # Calculate area of each item in aoi_proj
-  aoi_proj$area <- st_area(aoi_proj)
-  return(aoi_proj)
+### Reproject each shp to match `fvs_sf`
+```{r}
+for(i in 1:length(shp_list)){
+  shp_list[[i]] <- st_transform(shp_list[[i]], st_crs(fvs_sf))
 }
 ```
 
-### Apply `aoi_prep()` to each shapefile
+### Add FVS variant column to each shapefile
 ```{r}
-shp_list_new <- lapply(shp_list, aoi_prep) #takes a second
+# Function to intersect and assign dominant FVSVariant
+assign_fvsvariant <- function(shp) {
+  # Intersect with fvs_sf
+  intersection <- st_intersection(shp, fvs_sf)
+  
+  # Calculate area of each intersected piece
+  intersection$area <- st_area(intersection)
+  
+  # Summarize area by FVSVariant for each original polygon
+  dominant_variant <- intersection %>%
+    arrange(desc(area)) %>% 
+    slice_max(area, n = 1) %>%
+    select(FVSVariant) %>% 
+    st_drop_geometry() %>% 
+    unlist()
+  
+  # Join back to original shp
+  shp$FVSVariant <- dominant_variant
+  return(shp)
+}
 ```
 
-### Combine all shapefiles 
 ```{r}
-combined <- lapply(seq_along(shp_list_new), function(i) {
-  map <- shp_list_new[[i]]
-  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  map$TCN <- as.character(map$TCN)
-  map
-}) |> bind_rows()
-
-# Ensure valid geometries
-combined <- st_make_valid(combined %>% st_zm)
+shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
 
@@ -271,9 +263,9 @@ map_list <- list()
 treemap_areas_list <- list()
 shp_areas_list <- list()
 TCN_list <- list()
-for (i in 1:length(shp_list_new)) {
+for (i in 1:length(shp_list)) {
   print(i)
-  shp_sf <- shp_list_new[[i]]
+  shp_sf <- shp_list[[i]]
   shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
 
@@ -298,7 +290,7 @@ for (i in 1:length(shp_list_new)) {
   
   # Remove columns
   intersected_sf_buff  <- intersected_sf_buff  %>% 
-    select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
+    select(TM_ID, FVSVariant)
   # Calculate areas
   intersected_buff  <- intersected_sf_buff  %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
@@ -322,7 +314,7 @@ for (i in 1:length(shp_list_new)) {
   
   # Remove columns
   intersected_sf <- intersected_sf %>% 
-    select(TM_ID, FVSVariant, FVSLocCode, STAND_ID, Latitude, Longitude)
+    select(TM_ID, FVSVariant)
   # Calculate areas
   intersected <- intersected_sf %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
@@ -390,6 +382,19 @@ flextable(areas_table)
 ```
 
 # Maps & Overlaps
+
+### Combine all shapefiles for plotting
+```{r}
+combined <- lapply(seq_along(shp_list), function(i) {
+  map <- shp_list[[i]]
+  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
+  map$TCN <- as.character(map$TCN)
+  map
+}) |> bind_rows()
+
+# Ensure valid geometries
+combined <- st_make_valid(combined %>% st_zm)
+```
 
 ### Plot all treatments together and highlight overlaps
 ```{r}
