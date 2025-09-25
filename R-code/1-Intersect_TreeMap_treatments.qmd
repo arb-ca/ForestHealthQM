@@ -7,8 +7,11 @@ format:
     embed-resources: TRUE
     toc: TRUE
 ---
+# User Inputs - Change these each project
 
-## Define the name and ID number of the project
+*These are the things you have to edit between projects*
+
+### Define the name and ID number of the project
 
 ```{r}
 proj_name <- "Upper Pit River Forest Health Project, Phase 2"
@@ -18,17 +21,19 @@ proj_name <- "Upper Pit River Forest Health Project, Phase 2"
 project_ID <- "8GG20600"
 ```
 
-## Define impact area buffer distance, in meters
+### Define impact area buffer distance, in meters
 ```{r}
 buffer_dist <- 1500
 ```
 
-# Define which treatments are reforestation or biomass utilization. These do not require FVS inputs.
+### Define which treatments are reforestation or biomass utilization. These do not require FVS inputs.
+
+List the TCNs of treatments not needing FVS input files
 ```{r}
-noFVS <- c(0)
+noFVS <- c("7.1", "7.2", "7.3", "7.4", "7.5", "12.1", "10.1")
 ```
 
-## Define which year of TreeMap you want to use
+### Define which year of TreeMap you want to use
 ```{r}
 tm <- 2022 # Options = 2016, 2020, 2022
 ```
@@ -73,7 +78,7 @@ lapply(required_packages, require, character.only = TRUE)
 
 # Setup
 
-*These are the things you have to edit between runs*
+*These are the things you have to edit if it's your first time using this script*
 
 ### Define directory with CA perimeter shapefile in it
 
@@ -167,8 +172,9 @@ for(i in 1:length(shapefiles)){
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
 ```
 
-# Prepare shapefiles & TreeMap raster for spatial overlay
 
+
+# Prepare shapefiles & TreeMap raster for spatial overlay
 
 ### Make sure that each shapefile has TCN variable and rename if necessary
 ```{r}
@@ -207,6 +213,13 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
+```{r}
+for(i in 1:length(shp_list)){
+  print(paste(shp_list[[i]]$TCN, "is", shp_list[[i]]$Tobj))
+  }
+```
+
+
 # Overlap treatments and FVS variants
 
 ### Prep `fvs_varloc`
@@ -226,7 +239,7 @@ for(i in 1:length(shp_list)){
 ```
 
 ### Add FVS variant column to each shapefile
-```{r}
+```{r, warning = FALSE}
 # Function to intersect and assign dominant FVSVariant
 assign_fvsvariant <- function(shp) {
   # Intersect with fvs_sf
@@ -249,7 +262,7 @@ assign_fvsvariant <- function(shp) {
 }
 ```
 
-```{r}
+```{r, warning = FALSE}
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
@@ -417,7 +430,6 @@ ggplot() +
 ```
 
 ### Plot each treatment separately
-
 ```{r}
 for (i in seq_along(map_list)) {
   print(names(map_list)[i])
@@ -504,16 +516,16 @@ fvs_varloc <- st_as_sf(fvs_varloc) %>%
 ```
 
 ```{r}
-centroids <- st_centroid(shp %>% st_zm())
-circle_buffer <- st_buffer(centroids, dist = 8000)
+centroids <- st_centroid(combined %>% st_zm())
+circle_buffer <- st_buffer(centroids, dist = 5000)
 
 ggplot() +
       geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
     geom_sf(data = ca, fill = NA)+
   geom_sf(data = circle_buffer, col = "red", fill = "red")
-
 ```
 
 ```{r}
-print(paste("FVS Variant selection for", basename(file_name), "is", unique(intersected$FVSVariant)))
+print(paste("FVS Variant selection is/are:"))
+unique(combined$FVSVariant)
 ```
