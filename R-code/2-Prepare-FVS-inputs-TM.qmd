@@ -8,13 +8,22 @@ format:
     toc: TRUE
 ---
 
+# User Inputs - Change these each project
+
+*These are the things you have to edit for each project*
+
 ## Define the name and ID number of the project
 ```{r}
-proj_name <- "Lake_County_Wildfire_Resilience_Phase3"
+proj_name <- "Upper Pit River Forest Health Project, Phase 2"
 ```
 
 ```{r}
-project_ID <- "8GG24602"
+project_ID <- "8GG20600"
+```
+
+### Define which year of TreeMap you want to use
+```{r}
+tm_year <- 2022 # Options = 2016, 2020, 2022
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -37,36 +46,29 @@ require(writexl)
 
 # Setup
 
-*These are the things you have to edit between runs*
-
-## Define which year of TreeMap you want to use
-```{r}
-tm_year <- 2022 # Options = 2016, 2020, 2022
-```
+*These are the things you have to edit if it's your first time using this script*
 
 
-# Load output of Step 1
-
-## Define input and output dir
+### Define input and output dir
 ```{r}
 treemap_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
 input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Input"
 ```
 
-## Define where to find blank FVS database
+### Define where to find blank FVS database
 ```{r}
 blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
 ```
 
-## Load areas files 
+### Load areas files from Script 1
 
 These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 
 # Individual areas files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
-area_files <- list.files(input_dir, pattern = "_areas_TM.xlsx$", full.names = TRUE)
+area_files <- list.files(input_dir, pattern = "_areas.xlsx$", full.names = TRUE)
 if(length(area_files)>0){
   print("input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(area_files)))
@@ -74,12 +76,6 @@ if(length(area_files)>0){
   print("***ALERT*** Missing input files with areas of each StandID ")
 }
 ```
-
-## Load Impact Area areas file
-```{r}
-impact_file <- list.files(input_dir, pattern = "Impact_areas", full.names = TRUE)
-```
-
 
 ## Load TreeMap tree tables
 ```{r}
@@ -156,15 +152,6 @@ tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm_year) {
     mutate(TM_ID = as.character(TM_ID))
   num_polygons <- length(df) #get the number of unique treemapper IDs
   variant_list <- list(unique(df$FVSVariant))
-  # Check whether any stands have same TM_ID but different FVS code
-  same_TM_diff_Var <- df %>% 
-    group_by(TM_ID, FVSVariant) %>% 
-    count() %>% 
-    filter(n>1) %>% 
-    nrow()
-  if(same_TM_diff_Var==0){
-    print("There are no polygons with the same TM_ID but multiple FVS variants")
-  }
   stand_init <- blank_stand_init %>% 
     mutate(STAND_ID = as.character(STAND_ID))
   stand_init <- add_row(stand_init, STAND_ID = df$TM_ID)
@@ -172,9 +159,6 @@ tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm_year) {
   stand_init$INV_YEAR <- tm_year #fill inventory year column
   stand_init$GROUPS <- "All_Stands" #fill groups column
   stand_init$PROJECT_NAME <- proj_name #fill project name column
-  stand_init$LATITUDE <- df$Latitude #fill latitude column
-  stand_init$LONGITUDE <- df$Longitude #fill longtitude column
-  stand_init$LOCATION <- df$FVSLocCode #fill location column
   stand_init$INV_PLOT_SIZE <- 1 #fill inventory plot size column
   stand_init$BRK_DBH <- 999 #fill brk_dbh column
   stand_init$NUM_PLOTS <- 1 #fill num_plots column
@@ -258,21 +242,3 @@ for (i in 1:length(area_files)){
   print(paste("Created FVS inputs saved as", file))
 }
 ```
-
-# Build Impact Area FVS inputs
-```{r}
-stand_table <- tm_stand_init(area_file = impact_file, 
-              blank_stand_init = blank_stand, 
-              proj_name = proj_name, 
-              tm_year = tm_year) 
-tree_table <- tm_tree_init(area_file = impact_file,
-           blank_tree_init = blank_tree,
-           tm_tree_list = tm_trees)
-basename <- tools::file_path_sans_ext(basename(impact_file))
-basename <- gsub("_areas", "", basename)
-file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
-write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
-print(paste("Created FVS inputs saved as", file))
-```
-
-
