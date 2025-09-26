@@ -1,0 +1,148 @@
+---
+title: "7. Query PostCRPT - Reforestation"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This run is for project `8GG20600`
+## TCN = `7.1`
+
+# Setup
+
+## Define fire year
+```{r}
+fire_year <- 2014
+```
+
+## Define reforestation shapefile path
+```{r}
+shp_path <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20600/8GG20600_CloseoutShapefiles/8GG20600_7_1_20250417.shp"
+```
+
+## Define PostCRPT raster path
+```{r}
+ps_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/PostCRPT/composite conifer regen prob"
+```
+
+## Define impact area FVS input filepath
+
+This will not be used in FVS but will be used to determine what species the regen is likely to be based on nearby species.
+```{r}
+fvs_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/FVS_input/FVS_input_IA_8GG20600_7_1_20250417.xlsx"
+```
+
+
+## Define path to TreeMap species codes lookup table
+```{r}
+species_path <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap/species_codes.xlsx"
+```
+
+
+```{r, include = F}
+require(sf)
+require(terra)
+require(tidyverse)
+require(readxl)
+```
+
+# Load data
+
+## Reforestation polygons
+```{r}
+shp <- st_read(shp_path)
+```
+
+## PostCRPT layer(s)
+```{r}
+rast_name <- paste0("conifer_regen_prob_", fire_year, ".tif")
+rast_path <- file.path(ps_path, rast_name)
+ps <- rast(rast_path)
+```
+
+## FVS input data
+```{r}
+fvs <- read_excel(fvs_path, sheet = "FVS_TreeInit")
+```
+
+## species codes
+```{r}
+species <- read_excel(species_path)
+```
+
+
+# Align crs's
+```{r}
+shp <- st_transform(shp, st_crs(ps))
+```
+
+# Mask fire to shp
+```{r}
+ps <- crop(ps, shp, mask = T)
+```
+
+# Map it
+```{r}
+shp <- vect(shp)
+plot(shp)
+plot(ps, add = T)
+```
+
+# Calculate mean regen probability
+```{r}
+prob <- mean(na.omit(values(ps)))
+```
+
+```{r}
+print(paste("The mean regen probability from PostCRPT is", round(prob,3)))
+```
+
+# Convert to TPA
+
+# The assumption is that 100% probability = 67.448 TPA, so to convert probability to TPA, multiply it by 67.448
+```{r}
+TPA <- prob*67.448
+TPA <- round(TPA)
+```
+
+```{r}
+print(paste("The mean TPA based on PostCRPT is", round(TPA)))
+```
+
+# Determine what tree species the regen is likely to be
+```{r}
+species_regen <- fvs %>% 
+  filter(DBH>20) %>% 
+  group_by(Species) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+## Cross-references with species table
+```{r}
+species_regen <- left_join(species_regen, species, by = join_by(Species==SPCD)) 
+  
+```
+
+```{r}
+
+# Remove species with <10%
+species_regen <- species_regen %>% 
+  filter(n/sum(species_regen$n)>0.1)
+
+species_regen$prop <- species_regen$n / sum(species_regen$n)
+
+# Apply proportions to TPA
+species_regen$tpa_estimate <- round(species_regen$prop * TPA)
+
+# Adjust to ensure total adds up to TPA
+diff <- TPA - sum(species_regen$tpa_estimate)
+species_regen$tpa_estimate[which.max(species_regen$tpa_estimate)] <-
+  species_regen$tpa_estimate[which.max(species_regen$tpa_estimate)] + diff
+
+print(species_regen)
+```
+

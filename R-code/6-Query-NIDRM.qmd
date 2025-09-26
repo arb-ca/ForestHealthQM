@@ -1,0 +1,89 @@
+---
+title: "6. Query NIDRM Data for Pest Management QM"
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
+---
+
+# This run is for project `Lake County Wildfire Resilience Phase 3`
+
+
+```{r, include = F}
+require(terra)
+require(sf)
+require(ggplot2)
+```
+
+
+```{r}
+project_ID <- "8GG24602"
+```
+
+For this project, the pest managemnet TCNs = 3.1, 3.2, 3.3
+
+# Define the shapefiles of pest management treatments
+```{r}
+shapefile_path <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles/71625010_3_1_20250114.shp"
+```
+
+# Load the shapefile
+```{r}
+shp <- vect(shapefile_path)
+plot(shp, col = "pink")
+```
+
+
+# Load NIDRM data -- `NIDRM_updated.tif`
+```{r}
+
+# Define the file path
+nidrm_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/NIDRM/NIDRM_updated.tif"
+
+# Load the raster
+nidrm <- rast(nidrm_path)
+```
+
+
+# Clip and mask nirdm_udpated to the size and shape of the treatment polygon
+
+## match crs's
+```{r}
+if(crs(nidrm)==crs(shp)){
+  print("coordinate reference systems match")
+} else{
+  nidrm <- project(nidrm, crs(shp))
+}
+```
+
+## Clip and mask
+```{r}
+shp_buff <- buffer(shp, 20)
+shp_nidrm <- crop(nidrm, shp_buff)
+shp_nidrm <- mask(shp_nidrm, shp_buff)
+```
+
+# Plot
+```{r}
+r_df <- as.data.frame(shp_nidrm, xy = TRUE, na.rm = TRUE)
+names(r_df)[3] <- "value"
+
+shp_sf <- st_as_sf(shp)
+
+ggplot() +
+  geom_raster(data = r_df, aes(x = x, y = y, fill = value)) +
+  geom_sf(data = shp_sf, fill = NA, color = "red", size = 0.6) +
+  scale_fill_viridis_c() +  
+  coord_sf() +
+  labs(title = "NIDRM Raster + treatment shapefile", fill = "Value") +
+  theme_minimal()
+
+```
+
+# Calculate the mean NIDRM value for the shapefile
+```{r}
+mean(na.omit(values(shp_nidrm)))
+```
+
