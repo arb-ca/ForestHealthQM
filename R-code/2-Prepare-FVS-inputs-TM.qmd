@@ -1,6 +1,6 @@
 ---
 title: "2. Generating FVS Init from Treemap"
-author: "Kayla Johnston and Carmen Tubbesing"
+author: "Carmen Tubbesing"
 date: "`r Sys.Date()`"
 format: 
   html:
@@ -65,7 +65,7 @@ blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
 
 These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 
-# Individual areas files 
+# Individual treatment areas files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
 area_files <- list.files(input_dir, pattern = "_areas.xlsx$", full.names = TRUE)
@@ -76,6 +76,19 @@ if(length(area_files)>0){
   print("***ALERT*** Missing input files with areas of each StandID ")
 }
 ```
+
+# Individual impact area files 
+```{r}
+# list the excel files in inputs_dir that end with "_areas_TM"
+IA_files <- list.files(input_dir, pattern = "_areas_IA.xlsx$", full.names = TRUE)
+if(length(IA_files)>0){
+  print("Impact Area input files with areas of each StandID are:")
+  print(tools::file_path_sans_ext(basename(IA_files)))
+} else{
+  print("***ALERT*** Missing input files with areas of each StandID ")
+}
+```
+
 
 ## Load TreeMap tree tables
 ```{r}
@@ -224,7 +237,7 @@ tm_tree_init <- function(area_file, blank_tree_init, tm_tree_list) {
 }
 ```
 
-# Build FVS inputs
+# Build FVS inputs for treatment areas
 ```{r}
 for (i in 1:length(area_files)){
   print(i)
@@ -242,3 +255,23 @@ for (i in 1:length(area_files)){
   print(paste("Created FVS inputs saved as", file))
 }
 ```
+
+# Build FVS inputs for impact areas
+```{r}
+for (i in 1:length(IA_files)){
+  print(i)
+  stand_table <- tm_stand_init(area_file = IA_files[i], 
+                blank_stand_init = blank_stand, 
+                proj_name = proj_name, 
+                tm_year = tm_year) 
+  tree_table <- tm_tree_init(area_file = IA_files[i],
+             blank_tree_init = blank_tree,
+             tm_tree_list = tm_trees)
+  basename <- tools::file_path_sans_ext(basename(IA_files[i]))
+  basename <- gsub("_areas_IA", "", basename)
+  file <- paste0(output_dir, "/FVS_input_IA_", basename, ".xlsx")
+  write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
+  print(paste("Created FVS inputs saved as", file))
+}
+```
+
