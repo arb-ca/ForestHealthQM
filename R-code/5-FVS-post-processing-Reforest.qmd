@@ -8,9 +8,8 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `Lake County Wildfire Resilience Phase 3`
-## TCN = `1.1`
-## Shapefile = `71625010_1_1_20250114.shp`
+# This run is for project `FY23-24_8GG23626_American_Forests`
+## TCN = `3&4`
 
 # Setup
 ```{r, include = F}
@@ -21,8 +20,14 @@ require(ggplot2)
 
 ## Set the acreage of your reforestation treatment
 ```{r}
-area_ac <- 450
+area_ac <- 400
 ```
+
+### Set the end year when carbon should be tallied
+```{r}
+end_yr <- 2105
+```
+
 
 ## Define folder where the FVS outputs are located
 *Note:* Replace this for the file folder on your computer
@@ -32,7 +37,7 @@ fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG24602_noTM.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG23636_RF1_M1PL.xlsx"))
 ```
 
 ```{r}
@@ -56,10 +61,10 @@ ggplot(df_means) +
 # Filter to last year of project
 ```{r}
 df <- df %>% 
-  filter(Year == max(df$Year))
+  filter(Year == end_yr)
 ```
 
-# Merge with areas from pre-FVS files and calculate results
+# Multiply by acres and calculate results
 -  Calculate total ending year carbon for each scenario
 -  Print results in the order they appear in `FRM_Calculator_Tool`
 ```{r}
