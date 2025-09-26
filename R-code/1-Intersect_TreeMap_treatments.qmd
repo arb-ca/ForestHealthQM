@@ -1,6 +1,6 @@
 ---
 title: "1. Overlaying treatment polygons with Treemap"
-author: "Kayla Johnston and Carmen Tubbesing"
+author: "Carmen Tubbesing"
 date: "`r Sys.Date()`"
 format: 
   html:
@@ -26,12 +26,14 @@ project_ID <- "8GG20600"
 buffer_dist <- 1500
 ```
 
-### Define which treatments are reforestation or biomass utilization. These do not require FVS inputs.
+### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 
 List the TCNs of treatments not needing FVS input files
 ```{r}
-noFVS <- c("7.1", "7.2", "7.3", "7.4", "7.5", "12.1", "10.1")
+noFVS <- c("7.2", "7.3", "7.4", "7.5", "12.1", "10.1")
 ```
+
+Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
 
 ### Define which year of TreeMap you want to use
 ```{r}
@@ -143,7 +145,7 @@ for (zip_file in zip_files) {
 print("All files have been extracted.")
 ```
 
-# List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
+## List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
 
 ```{r}
 shapefiles <- list.files(
@@ -171,8 +173,6 @@ for(i in 1:length(shapefiles)){
 ```{r}
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
 ```
-
-
 
 # Prepare shapefiles & TreeMap raster for spatial overlay
 
@@ -288,7 +288,8 @@ for (i in 1:length(shp_list)) {
   # }
   # Start with impact area
   shp_buff <- buffer(shp, width = buffer_dist)
-
+  shp_buff <- erase(shp_buff, shp)
+  shp_buff_sf <- st_as_sf(shp_buff)
   # Clip, mask, and convert to polygons
   shp_buff <- project(shp_buff, crs(tmrast))
   tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
@@ -339,12 +340,14 @@ for (i in 1:length(shp_list)) {
   
     # Plot using ggplot2
   map_name <- paste("map", base_name, sep = "_")
-  map <- ggplot(data = intersected_sf) +
-    geom_sf(aes(fill = as.factor(TM_ID)), color = NA) +
-    #geom_sf(data = intersected_sf_buff)+
+  map <- ggplot() +
+    #geom_sf(data = intersected_sf_buff, aes(fill = as.factor(TM_ID)), color = NA, alpha = .2) + # This slows down the script. Comment out to speed things up. 
+    geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
     labs(fill = "TreeMapper ID (TM_ID)")+
     theme(legend.position = "none")+
-    geom_sf(data = shp_sf, fill = NA)
+    geom_sf(data = shp_sf, fill = NA)+
+    geom_sf(data = shp_buff_sf, fill = NA)
+  
   map_list[[map_name]] <- map
   
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
