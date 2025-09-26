@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-```{r}
+```{r, include = F}
 require(tidyverse)
 require(readxl)
 require(writexl)
@@ -55,105 +55,24 @@ for(i in 1:nrow(df)){
   df5 <- convert_df(df=df, row=i, conservation_yn, fuel_yn-1)
   df6 <- convert_df(df=df, row=i, fuel_yn, ncol(df))
   
-  # Remove unnecessary questions by section
-  if(df[i, reforestation_yn]=="No"){
-    df2 <- df2[1,]
-  } else if(df[i, reforestation_2]=="No"){
-    n_questions_reforest <- reforestation_2-reforestation_yn+1
-    df2 <- df2[1:n_questions_reforest,]
-  } else if(df[i, reforestation_3]=="No"){
-    n_questions_reforest <- reforestation_3-reforestation_yn+1
-    df2 <- df2[1:n_questions_reforest,]
+  # Remove questions where the answer is NA for all 6 dfs
+  dfs <- c("df1", "df2", "df3", "df4", "df5", "df6")
+  for(i in 1:6){
+      dfi <- get(dfs[i])
+      dfi <- dfi[!is.na(dfi$Answer), ]
+      assign(dfs[i], dfi)
   }
-  if(df[i, pest_yn]=="No"){
-    df3 <- df3[1,]
-  }
-  if(df[i, biomass_yn]=="No"){
-    df4 <- df4[1,]
-  }
-  if(df[i, conservation_yn]=="No"){
-    df5 <- df5[1,]
-  }
-  if(df[i, fuel_yn]=="No"){
-    df6 <- df6[1,]
-  }
-
   
- # df6 <- df6[-df6_remove,]
   unnecessary_qs <- c("ID", "Start time", "Email", "Name", "Last modified time")
   df1 <- df1 %>% 
     filter(!Question %in% unnecessary_qs)
+  df6_remove <- which(grepl("Does your project contain additional fuel reduction treatments?", df6$Question))
+  df6 <- df6[-df6_remove,]
+    df6_remove <- which(grepl("Does your project include fuels reduction treatments?", df6$Question))
+  df6 <- df6[-df6_remove,]
+
   
   # Write to excel
-
-}
-
-```
-
-
-# Enter how many rows of questions each fuel treatment is
-```{r}
-mast_nrows <- 4
-rx_nrows <- 2
-thin_nrows <- 6
-pile_nrows <- 4
-other_nrows <- 1
-```
-
-# Define the row numbers within the fuel treatment questions where each fuel type begins
-```{r}
-fuels_type_rows <- which(grepl("What type of fuels reduction is this activity?", df6$Question))
-fuels_type_rows
-```
-
-
-```{r}
-for(i in 1:length(fuels_type_rows)){
-  fuels_type_row <- fuels_type_rows[i]
-  mast_start <- fuels_type_row+1
-  rx_start <- mast_start+mast_nrows
-  thin_start <- rx_start+rx_nrows
-  pile_start <- thin_start+thin_nrows
-  other_start <- pile_start+pile_nrows
-
-  df6_remove <- c()
-  remove_fuels_treatment_rows <- function(df6, fuels_type_row, mast_start, rx_start, thin_start, pile_start, other_start)
-  if(df6[fuels_type_row,"Answer"]=="Mastication"){
-    df6_remove <- c(df6_remove, rx_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Prescribed Broadcast Burning"){
-    df6_remove <- c(df6_remove, mast_start:(rx_start-1))
-    df6_remove <- c(df6_remove, thin_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Thinning from Below"){
-    df6_remove <- c(df6_remove, mast_start:(thin_start-1))
-    df6_remove <- c(df6_remove, pile_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Pile Burning"){
-    df6_remove <- c(df6_remove, mast_start:(pile_start-1))
-    df6_remove <- c(df6_remove, other_start)
-  } else {
-    df6_remove <- c(df6_remove, mast_start:(other_start-1))
-  }
-
-  if(df6[fuels_type,"Answer"]=="Mastication"){
-    df6_remove <- c(df6_remove, rx_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Prescribed Broadcast Burning"){
-    df6_remove <- c(df6_remove, mast_start:(rx_start-1))
-    df6_remove <- c(df6_remove, thin_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Thinning from Below"){
-    df6_remove <- c(df6_remove, mast_start:(thin_start-1))
-    df6_remove <- c(df6_remove, pile_start:other_start)
-  } else if(df6[fuels_type,"Answer"]=="Pile Burning"){
-    df6_remove <- c(df6_remove, mast_start:(pile_start-1))
-    df6_remove <- c(df6_remove, other_start)
-  } else {
-    df6_remove <- c(df6_remove, mast_start:(other_start-1))
-  }
-
-
-}
-```
-
-
-```{r}
   file_name <- paste0("../../form_responses/", id, ".xlsx")
   sheets <- list("Project"=df1, 
                  "Reforestation" =df2, 
@@ -162,5 +81,6 @@ for(i in 1:length(fuels_type_rows)){
                  "Conservation"=df5, 
                  "Fuels_Reduction"=df6)
   write_xlsx(sheets, file_name)
+}
 ```
 
