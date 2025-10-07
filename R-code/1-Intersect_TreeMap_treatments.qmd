@@ -14,11 +14,11 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Upper Pit River Forest Health Project, Phase 2"
+proj_name <- "custom polygon from Kevin, 10/7"
 ```
 
 ```{r}
-project_ID <- "8GG20600"
+project_ID <- "Burtoncreekflight_poly_v2"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -30,7 +30,7 @@ buffer_dist <- 1500
 
 List the TCNs of treatments not needing FVS input files
 ```{r}
-noFVS <- c("7.2", "7.3", "7.4", "7.5", "12.1", "10.1")
+noFVS <- c(0)
 ```
 
 Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20600/8GG20600_CloseoutShapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/Burtoncreekflight_poly_v2"
 ```
 
 
@@ -179,7 +179,7 @@ print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list),
 ### Make sure that each shapefile has TCN variable and rename if necessary
 ```{r}
 # Define possible names for the TCN column
-tcn_variants <- c("Tcn", "TreatmentC", "tcn", "treatmentc")
+tcn_variants <- c("Tcn", "TreatmentC", "tcn", "treatmentc", "TNumber")
 
 # Function to rename the TCN column in a single sf object
 rename_tcn_column <- function(sf_obj) {
@@ -197,7 +197,7 @@ shp_list <- lapply(shp_list, rename_tcn_column)
 
 ```{r}
 # Define possible names for the TCN column
-Tobj_variants <- c("Tobj", "TreatmentO", "TObj")
+Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective")
 
 # Function to rename the TCN column in a single sf object
 rename_Tobj_column <- function(sf_obj) {
@@ -218,7 +218,6 @@ for(i in 1:length(shp_list)){
   print(paste(shp_list[[i]]$TCN, "is", shp_list[[i]]$Tobj))
   }
 ```
-
 
 # Overlap treatments and FVS variants
 
@@ -389,7 +388,9 @@ shp_areas_df <- shp_areas_df %>%
   rename("Shapefile Acres" = Value) %>% 
   rename(Shapefile = Name)
 
-shp_areas_df <- full_join(tcn_df, shp_areas_df)
+if(length(tcn_df)>0){
+ shp_areas_df <- full_join(tcn_df, shp_areas_df) 
+}
 
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1))
@@ -404,7 +405,9 @@ flextable(areas_table)
 combined <- lapply(seq_along(shp_list), function(i) {
   map <- shp_list[[i]]
   map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  map$TCN <- as.character(map$TCN)
+  if(length(tcn_df)>0){
+      map$TCN <- as.character(map$TCN)
+  }
   map
 }) |> bind_rows()
 
@@ -423,13 +426,15 @@ plot_data <- bind_rows(combined, overlaps)
 ```
 
 ```{r, out.width="100%", fig.height=16}
-ggplot() +
-  geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
-  geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
-  theme_minimal() +
-  labs(title = "All TCNs -- Overlaps are darkened",
-       fill = "TCN", 
-       col = "TCN")
+if(length(tcn_df)>0){
+  ggplot() +
+    geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
+    geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
+    theme_minimal() +
+    labs(title = "All TCNs -- Overlaps are darkened",
+         fill = "TCN", 
+         col = "TCN")
+}
 ```
 
 ### Plot each treatment separately
@@ -461,9 +466,11 @@ result <- data.frame(
 # Create a consistent ordering for each pair
 result$pair_id <- apply(result, 1, function(x) paste(sort(x), collapse = "/"))
 # Keep only unique pairs
-unique_df <- result[!duplicated(result$pair_id), c("Row", "Column")]
-for(i in 1:nrow(unique_df)){
-  print(paste(unique_df[i, 1], "overlaps with", unique_df[i, 2]))
+if(nrow(result)>0){
+  unique_df <- result[!duplicated(result$pair_id), c("Row", "Column")]
+  for(i in 1:nrow(unique_df)){
+    print(paste(unique_df[i, 1], "overlaps with", unique_df[i, 2]))
+  }
 }
 ```
 
@@ -477,8 +484,10 @@ overlaps <- st_intersection(combined) %>%
 ### Plot each treatment group (e.g. 1.1 and 1.2) together, with overlaps
 
 ```{r}
-combined$treatment_group <- sub("\\..*", "", combined$TCN)
-overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
+if(length(tcn_df)>0){
+  combined$treatment_group <- sub("\\..*", "", combined$TCN)
+  overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
+}
 ```
 
 ```{r}
