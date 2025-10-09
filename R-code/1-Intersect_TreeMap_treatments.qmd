@@ -37,12 +37,12 @@ Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not
 
 ### Define which year of TreeMap you want to use
 ```{r}
-tm <- 2020 # Options = 2016, 2020, 2022
+tm <- 2022 # Options = 2016, 2020, 2022
 ```
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20618/20-FH-TUU-043-TreatmentAreas/"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20618/CalMapper shapefiles/CalMAPPER DB"
 ```
 
 
@@ -265,10 +265,12 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
-# Add TCN if there is none
+### Add TCN if there is none
 ```{r}
 for(i in 1:length(shp_list)){
-  shp_list[[i]]$TCN <- i
+  if(!"TCN" %in% names(shp_list[[i]])){
+    shp_list[[i]]$TCN <- i  
+  }
 }
 ```
 
