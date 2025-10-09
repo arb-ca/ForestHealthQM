@@ -14,11 +14,11 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "custom polygon from Kevin, 10/7"
+proj_name <- "American Forests Sequoia Wildfire Reforestation and Recovery Project"
 ```
 
 ```{r}
-project_ID <- "Burtoncreekflight_poly_v2"
+project_ID <- "8GG20618"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -37,12 +37,12 @@ Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not
 
 ### Define which year of TreeMap you want to use
 ```{r}
-tm <- 2022 # Options = 2016, 2020, 2022
+tm <- 2020 # Options = 2016, 2020, 2022
 ```
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/Burtoncreekflight_poly_v2"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20618/20-FH-TUU-043-TreatmentAreas/"
 ```
 
 
@@ -265,6 +265,13 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
+# Add TCN if there is none
+```{r}
+for(i in 1:length(shp_list)){
+  shp_list[[i]]$TCN <- i
+}
+```
+
 
 # Loop the areas calculations across all shapefiles in a path
 
@@ -287,6 +294,12 @@ for (i in 1:length(shp_list)) {
   # }
   # Start with impact area
   shp_buff <- buffer(shp, width = buffer_dist)
+  shp_buff <- aggregate(
+    shp_buff,
+    by = c("FVSVariant", "TCN"),
+    fun = function(x) x[1]
+  )
+
   shp_buff <- erase(shp_buff, shp)
   shp_buff_sf <- st_as_sf(shp_buff)
   # Clip, mask, and convert to polygons
@@ -371,17 +384,29 @@ treemap_areas_df <- treemap_areas_df %>%
   mutate(Value = round(Value)) %>% 
   rename("TreeMap Acres" = Value) %>% 
   rename(Shapefile = Name)
+```
+
+## Sum areas for treatments with multipart polygons
+```{r}
+shp_areas_list_sums <- sapply(shp_areas_list, sum)
 
 shp_areas_df <- tibble(
-  Name = names(shp_areas_list),
-  Value = unlist(shp_areas_list)
+  Name = names(shp_areas_list_sums),
+  Value = unlist(shp_areas_list_sums)
 ) 
+```
+
+## Do the same for TCN
+```{r}
+TCN_list <- sapply(TCN_list, mean)
 
 tcn_df <- tibble(
   Shapefile = names(TCN_list),
   TCN = unlist(TCN_list)
 )
+```
 
+```{r}
 shp_areas_df <- shp_areas_df %>% 
   mutate(Value = Value/4046.86) %>% 
   mutate(Value = round(Value)) %>% 
@@ -397,6 +422,7 @@ areas_table <- full_join(shp_areas_df, treemap_areas_df) %>%
 # Print a pretty table
 flextable(areas_table)
 ```
+
 
 # Maps & Overlaps
 
