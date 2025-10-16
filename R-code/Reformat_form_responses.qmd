@@ -11,16 +11,19 @@ require(writexl)
 ```
 
 # Load form responses
+
 ```{r}
-df <- read_excel("../../form_responses/Forest Restoration & Management QM(1-2).xlsx")
+df <- read_excel("../../form_responses/Forest Restoration & Management QM Oct15 2025.xlsx")
 ```
 
 # Define the question number within the fuels treatment section that asks which fuels treatment type
+
 ```{r}
 fuels_question <- "What type of fuels reduction is this activity?"
 ```
 
 # Identify key columns that tell you which project type exists
+
 ```{r}
 id_q <- 14
 reforestation_yn <- 18
@@ -33,6 +36,7 @@ fuel_yn <- 105
 ```
 
 # Define function to create each of the six sub-data-frames
+
 ```{r}
 convert_df <- function(df, row, col_min, col_max){
   df_new <- df[row, col_min:col_max] %>% t() %>% as_tibble()
@@ -45,9 +49,14 @@ convert_df <- function(df, row, col_min, col_max){
 ```
 
 # Transpose, clean, and write an excel file for each project
+
 ```{r}
 for(i in 1:nrow(df)){
   id <- df[i, id_q] %>% unlist()
+  if(is.na(id)){
+    id <- df[i, "Project Name"]
+  }
+  print(unlist(id))
   df1 <- convert_df(df=df, row=i, 1, reforestation_yn-1)
   df2 <- convert_df(df=df, row=i, reforestation_yn, pest_yn-1)
   df3 <- convert_df(df=df, row=i, pest_yn, biomass_yn-1)
@@ -57,10 +66,10 @@ for(i in 1:nrow(df)){
   
   # Remove questions where the answer is NA for all 6 dfs
   dfs <- c("df1", "df2", "df3", "df4", "df5", "df6")
-  for(i in 1:6){
-      dfi <- get(dfs[i])
-      dfi <- dfi[!is.na(dfi$Answer), ]
-      assign(dfs[i], dfi)
+  for(j in 1:6){
+      dfj <- get(dfs[j])
+      dfj <- dfj[!is.na(dfj$Answer), ]
+      assign(dfs[j], dfj)
   }
   
   unnecessary_qs <- c("ID", "Start time", "Email", "Name", "Last modified time")
@@ -83,4 +92,3 @@ for(i in 1:nrow(df)){
   write_xlsx(sheets, file_name)
 }
 ```
-

@@ -14,11 +14,11 @@ format:
 
 ## Define the name and ID number of the project
 ```{r}
-proj_name <- "Upper Pit River Forest Health Project, Phase 2"
+proj_name <- "American FOrests Sequoia Wildfire Reforestation and Recovery Project"
 ```
 
 ```{r}
-project_ID <- "8GG20600"
+project_ID <- "8GG20618"
 ```
 
 ### Define which year of TreeMap you want to use
@@ -67,7 +67,7 @@ These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 
 # Individual treatment areas files 
 ```{r}
-# list the excel files in inputs_dir that end with "_areas_TM"
+# list the excel files in inputs_dir that end with "_areas"
 area_files <- list.files(input_dir, pattern = "_areas.xlsx$", full.names = TRUE)
 if(length(area_files)>0){
   print("input files with areas of each StandID are:")

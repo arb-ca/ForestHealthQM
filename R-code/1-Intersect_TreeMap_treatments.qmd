@@ -420,7 +420,8 @@ if(length(tcn_df)>0){
 }
 
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
-  mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1))
+  mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
+  arrange(TCN)
 # Print a pretty table
 flextable(areas_table)
 ```
