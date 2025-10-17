@@ -18,7 +18,7 @@ proj_name <- "American Forests Sequoia Wildfire Reforestation and Recovery Proje
 ```
 
 ```{r}
-project_ID <- "8GG20618"
+project_ID <- "8GG24601"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/reforestation/8GG20618/CalMapper shapefiles/CalMAPPER DB"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles"
 ```
 
 
@@ -64,7 +64,8 @@ required_packages <- c(
   "writexl",
   "ggplot2",
   "flextable",
-  "gridExtra"
+  "gridExtra",
+  "RColorBrewer"
 )
 
 # Install missing packages
@@ -197,7 +198,7 @@ shp_list <- lapply(shp_list, rename_tcn_column)
 
 ```{r}
 # Define possible names for the TCN column
-Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective")
+Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective", "Tobjective")
 
 # Function to rename the TCN column in a single sf object
 rename_Tobj_column <- function(sf_obj) {
@@ -274,6 +275,193 @@ for(i in 1:length(shp_list)){
 }
 ```
 
+### Combine all shapefiles for plotting
+```{r}
+combined_shp <- lapply(seq_along(shp_list), function(i) {
+  map <- shp_list[[i]]
+  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
+  map
+}) |> bind_rows()
+
+# Ensure valid geometries
+combined_shp <- st_make_valid(combined_shp %>% st_zm)
+```
+
+```{r}
+ggplot(combined_shp)+
+  geom_sf(aes(fill = as.factor(TCN)), alpha = .3) +
+  geom_sf(data = combined_shp %>% filter(TCN==1.4), fill = "red", alpha = 0.7)+
+  geom_sf(data = combined_shp %>% filter(TCN==1.6), fill = "yellow", alpha = 0.7)
+
+```
+
+
+# Impact Area calculations
+
+### Create polygons around each treatment and crop them based on overlap
+```{r}
+buffers <- list()
+for (i in 1:length(shp_list)) {
+  shp_sf <- shp_list[[i]]
+  shp_sf$trt_area <- st_area(shp_sf)
+  shp <- vect(shp_sf)
+  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+
+  # if(shp_sf$TCN %in% noFVS){
+  #   print(paste("Skipping TCN =", shp_sf$TCN))
+  #   next
+  # }
+  # Start with impact area
+  shp_buff <- buffer(shp, width = buffer_dist)
+  shp_buff <- aggregate(
+    shp_buff,
+    by = c("FVSVariant", "TCN"),
+    fun = function(x) x[1]
+  )
+
+  shp_buff <- erase(shp_buff, shp)
+  
+  shp_buff_sf <- st_as_sf(shp_buff)
+  shp_buff_sf$trt_area <- as.numeric(shp_buff_sf$trt_area)
+  buffers[[base_name]] <- shp_buff_sf
+}
+```
+
+### Plot them all together, limiting to Fuel Reduction
+```{r}
+buff_combined <- buffers |> bind_rows() %>% 
+  filter(Tobj == "Fuels Reduction") %>% 
+   filter(!Tactivity %in% c("Pruning", "Chipping", "Prunning"))
+```
+
+```{r}
+impact_map_full <- ggplot(buff_combined)+
+  geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
+  ggtitle("Before removing overlaps")
+```
+
+### For each buffer area, if > half or more overlaps with other buffer areas, add it to a list called "Ignore"
+
+#### Assign `keep` to the largest treatment
+```{r}
+keep <- buff_combined %>% 
+  mutate(trt_area = as.numeric(trt_area)) %>% 
+  filter(trt_area == max(trt_area)) %>% 
+  slice(1)
+```
+
+```{r}
+ggplot(keep)+geom_sf()
+```
+
+#### For each other polygon, add it to `ignore` if it overlaps >80% with `keep`
+```{r}
+ignore <- c()
+for(i in 1:nrow(buff_combined)){
+  buff <- buff_combined[i,]
+  if(buff$TCN == keep$TCN){
+    next
+  }
+  inter <- st_intersection(buff, keep)
+  ggplot(inter)+
+    geom_sf(fill = "pink")+
+    geom_sf(data = buff, fill = "green", alpha = 0.3)
+  if (nrow(inter) > 0) {
+      inter_area <- st_area(inter)
+      buff_area <- st_area(buff)
+      if (as.numeric(inter_area) / as.numeric(buff_area) >= 0.5) {
+        ignore <- c(ignore, buff$TCN)
+      }
+    }
+}
+```
+
+#### Remove those from buff_combined
+```{r}
+buff_combined <- buff_combined %>% 
+  filter(!TCN %in% ignore)
+```
+
+#### Repeat the process with the next biggest treatment as `keep`
+```{r}
+keep <- buff_combined %>% 
+  filter(!TCN == keep$TCN) %>% 
+  mutate(trt_area = as.numeric(trt_area)) %>% 
+  filter(trt_area == max(trt_area)) %>% 
+  filter(!Tactivity %in% c("Pruning", "Chipping")) %>% 
+  slice(1)
+```
+
+```{r}
+ignore <- c()
+for(i in 1:nrow(buff_combined)){
+  buff <- buff_combined[i,]
+  if(buff$TCN == keep$TCN){
+    next
+  }
+  inter <- st_intersection(buff, keep)
+  ggplot(inter)+
+    geom_sf(fill = "pink")+
+    geom_sf(data = buff, fill = "green", alpha = 0.3)
+  if (nrow(inter) > 0) {
+      inter_area <- st_area(inter)
+      buff_area <- st_area(buff)
+      if (as.numeric(inter_area) / as.numeric(buff_area) >= 0.5) {
+        ignore <- c(ignore, buff$TCN)
+      }
+    }
+}
+```
+
+#### Remove those from buff_combined
+```{r}
+buff_combined <- buff_combined %>% 
+  filter(!TCN %in% ignore)
+```
+
+```{r}
+impact_map_filtered <- ggplot(buff_combined)+
+  geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
+  ggtitle("After removing overlaps")
+```
+
+```{r}
+grid.arrange(impact_map_full,impact_map_filtered, ncol = 2)
+```
+
+
+## Intersect the buffer polygons with TreeMap
+```{r}
+for(i in 1:nrow(buff_combined)){
+  shp_buff_sf <- buff_combined[i,]
+  shp_buff_sf <- st_transform(shp_buff_sf, crs(tmrast))
+  shp_buff <- shp_buff_sf %>% as.polygons()
+  tm_poly_buff <- crop(tmrast, shp_buff_sf, mask = T) 
+
+  # Intersect
+  intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff_sf) %>% 
+    st_as_sf()
+    # Remove columns
+  intersected_sf_buff  <- intersected_sf_buff  %>% 
+    select(TM_ID, FVSVariant)
+  # Calculate areas
+  intersected_buff  <- intersected_sf_buff  %>% 
+    mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
+    mutate(area_ac = area_m/4046.8726098743) %>% 
+    st_drop_geometry()
+    # Write results to table and to shapefile
+  file_name <- paste(output_dir, "/", "IA_areas_", buff_combined$TCN, ".xlsx", sep = "")
+  write_xlsx(intersected_buff, file_name)
+  print(paste("Created TreeMap Polygons for impact area of", shp_buff_sf$TCN))
+}
+```
+
+```{r}
+ggplot(shp_buff_sf)+
+  geom_sf()+
+  geom_sf(data = intersected_sf_buff)
+```
+
 
 # Loop the areas calculations across all shapefiles in a path
 
@@ -294,40 +482,8 @@ for (i in 1:length(shp_list)) {
   #   print(paste("Skipping TCN =", shp_sf$TCN))
   #   next
   # }
-  # Start with impact area
-  shp_buff <- buffer(shp, width = buffer_dist)
-  shp_buff <- aggregate(
-    shp_buff,
-    by = c("FVSVariant", "TCN"),
-    fun = function(x) x[1]
-  )
 
-  shp_buff <- erase(shp_buff, shp)
-  shp_buff_sf <- st_as_sf(shp_buff)
-  # Clip, mask, and convert to polygons
-  shp_buff <- project(shp_buff, crs(tmrast))
-  tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
-    as.polygons %>% 
-    makeValid()
-  # Intersect
-  intersected_buff <- terra::intersect(tm_poly_buff, shp_buff)
-  print(paste("Created TreeMap Polygons for impact area of", base_name))
 
-  # convert intersected to sf 
-  intersected_sf_buff <- sf::st_as_sf(intersected_buff)
-  
-  # Remove columns
-  intersected_sf_buff  <- intersected_sf_buff  %>% 
-    select(TM_ID, FVSVariant)
-  # Calculate areas
-  intersected_buff  <- intersected_sf_buff  %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
-    mutate(area_ac = area_m/4046.8726098743) %>% 
-    st_drop_geometry()
-  
-  # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", base_name, "_areas_IA.xlsx", sep = "")
-  write_xlsx(intersected_buff, file_name)
 
   # Now do for treatment no buffer
   tm_poly <- crop(tmrast, shp, mask = T) %>% 
@@ -429,20 +585,6 @@ flextable(areas_table)
 
 # Maps & Overlaps
 
-### Combine all shapefiles for plotting
-```{r}
-combined <- lapply(seq_along(shp_list), function(i) {
-  map <- shp_list[[i]]
-  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  if(length(tcn_df)>0){
-      map$TCN <- as.character(map$TCN)
-  }
-  map
-}) |> bind_rows()
-
-# Ensure valid geometries
-combined <- st_make_valid(combined %>% st_zm)
-```
 
 ### Plot all treatments together and highlight overlaps
 ```{r}
