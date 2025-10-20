@@ -14,11 +14,11 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Butte Creek - Buck Mountain Forest Health Project"
+proj_name <- "Lake County"
 ```
 
 ```{r}
-project_ID <- "8GG24601"
+project_ID <- "8GG24602"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -30,7 +30,7 @@ buffer_dist <- 1500
 
 List the TCNs of treatments not needing FVS input files
 ```{r}
-noFVS <- c(5.1)
+noFVS <- c()
 ```
 
 Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles"
 ```
 
 
@@ -166,7 +166,7 @@ basename(shapefiles)
 ```{r}
 shp_list <- list()
 for(i in 1:length(shapefiles)){
-  shp <- st_read(shapefiles[i], quiet= T)
+  shp <- st_read(shapefiles[i], quiet= T) %>% st_zm()
   shp_list[[i]] <- shp
 }
 ```
@@ -196,6 +196,7 @@ rename_tcn_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_tcn_column)
 ```
 
+### Rename objective column 
 ```{r}
 # Define possible names for the TCN column
 Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective", "Tobjective")
@@ -214,6 +215,26 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
+### Rename Activity column 
+```{r}
+# Define possible names for the TCN column
+Tobj_variants <- c("TActivity")
+
+# Function to rename the TCN column in a single sf object
+rename_Tobj_column <- function(sf_obj) {
+  current_names <- names(sf_obj)
+  match_name <- current_names[current_names %in% Tobj_variants]
+  if (length(match_name) == 1) {
+    names(sf_obj)[names(sf_obj) == match_name] <- "Tactivity"
+  }
+  return(sf_obj)
+}
+
+# Apply the function to each element in the list
+shp_list <- lapply(shp_list, rename_Tobj_column)
+```
+
+
 ```{r}
 for(i in 1:length(shp_list)){
   print(paste(shp_list[[i]]$TCN, "is", shp_list[[i]]$Tobj))
@@ -229,7 +250,6 @@ fvs_varloc <- makeValid(fvs_varloc)
 fvs_varloc <- project(fvs_varloc, crs(tmrast))
 fvs_sf <- st_as_sf(fvs_varloc)
 ```
-
 
 ### Reproject each shp to match `fvs_sf`
 ```{r}
@@ -330,7 +350,7 @@ for (i in 1:length(shp_list)) {
 ### Combine them and filter for fuels reduction
 ```{r}
 buff_combined <- buffers |> bind_rows() %>% 
-  filter(Tobj == "Fuels Reduction") %>% 
+  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire")) %>% 
    filter(!Tactivity %in% c("Pruning", "Chipping", "Prunning"))
 ```
 
@@ -416,13 +436,13 @@ buff_combined <- buff_combined %>%
 ```
 
 #### Map final impact area boundaries
-```{r, out.width="100%", fig.height=9}
+```{r}
 impact_map_filtered <- ggplot(buff_combined)+
   geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
   ggtitle("After removing overlaps")
 ```
 
-```{r}
+```{r, out.width="100%", fig.height=8}
 grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 ```
 
@@ -610,6 +630,8 @@ map_dupes <- combined_shp %>%
   group_by(geometry) %>% summarize(TCNs = paste(TCN, collapse = ", ")) %>% 
   st_drop_geometry()
 ```
+
+If multiple TCNs are listed, it means that the maps for those TCNs look identical
 
 ```{r}
 for(i in 1:nrow(map_dupes)){
