@@ -14,7 +14,7 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "American Forests Sequoia Wildfire Reforestation and Recovery Project"
+proj_name <- "Butte Creek - Buck Mountain Forest Health Project"
 ```
 
 ```{r}
@@ -30,7 +30,7 @@ buffer_dist <- 1500
 
 List the TCNs of treatments not needing FVS input files
 ```{r}
-noFVS <- c(0)
+noFVS <- c(5.1)
 ```
 
 Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
@@ -275,7 +275,7 @@ for(i in 1:length(shp_list)){
 }
 ```
 
-### Combine all shapefiles for plotting
+### Combine all shapefiles for mapping
 ```{r}
 combined_shp <- lapply(seq_along(shp_list), function(i) {
   map <- shp_list[[i]]
@@ -298,7 +298,7 @@ ggplot(combined_shp)+
 
 # Impact Area calculations
 
-### Create polygons around each treatment and crop them based on overlap
+### Create buffer polygons around each treatment and mask out the treatment area
 ```{r}
 buffers <- list()
 for (i in 1:length(shp_list)) {
@@ -307,11 +307,11 @@ for (i in 1:length(shp_list)) {
   shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
 
-  # if(shp_sf$TCN %in% noFVS){
-  #   print(paste("Skipping TCN =", shp_sf$TCN))
-  #   next
-  # }
-  # Start with impact area
+  if(shp_sf$TCN %in% noFVS){
+    print(paste("Skipping TCN =", shp_sf$TCN))
+    next
+  }
+
   shp_buff <- buffer(shp, width = buffer_dist)
   shp_buff <- aggregate(
     shp_buff,
@@ -327,12 +327,13 @@ for (i in 1:length(shp_list)) {
 }
 ```
 
-### Plot them all together, limiting to Fuel Reduction
+### Combine them and filter for fuels reduction
 ```{r}
 buff_combined <- buffers |> bind_rows() %>% 
   filter(Tobj == "Fuels Reduction") %>% 
    filter(!Tactivity %in% c("Pruning", "Chipping", "Prunning"))
 ```
+
 
 ```{r}
 impact_map_full <- ggplot(buff_combined)+
@@ -340,9 +341,9 @@ impact_map_full <- ggplot(buff_combined)+
   ggtitle("Before removing overlaps")
 ```
 
-### For each buffer area, if > half or more overlaps with other buffer areas, add it to a list called "Ignore"
+### For each buffer area, if half or more overlaps with other buffer areas, add it to a list called `ignore`
 
-#### Assign `keep` to the largest treatment
+#### Assign `keep` to the largest treatment 
 ```{r}
 keep <- buff_combined %>% 
   mutate(trt_area = as.numeric(trt_area)) %>% 
@@ -350,12 +351,8 @@ keep <- buff_combined %>%
   slice(1)
 ```
 
-```{r}
-ggplot(keep)+geom_sf()
-```
-
-#### For each other polygon, add it to `ignore` if it overlaps >80% with `keep`
-```{r}
+#### For each other polygon, add it to `ignore` if it overlaps >50% with `keep`
+```{r, warning=FALSE}
 ignore <- c()
 for(i in 1:nrow(buff_combined)){
   buff <- buff_combined[i,]
@@ -376,15 +373,15 @@ for(i in 1:nrow(buff_combined)){
 }
 ```
 
-#### Remove those from buff_combined
+#### Remove `ignore` from `buff_combined`
 ```{r}
 buff_combined <- buff_combined %>% 
   filter(!TCN %in% ignore)
 ```
 
-#### Repeat the process with the next biggest treatment as `keep`
+#### Repeat the process with the next biggest treatment as `keep2`
 ```{r}
-keep <- buff_combined %>% 
+keep2 <- buff_combined %>% 
   filter(!TCN == keep$TCN) %>% 
   mutate(trt_area = as.numeric(trt_area)) %>% 
   filter(trt_area == max(trt_area)) %>% 
@@ -392,14 +389,14 @@ keep <- buff_combined %>%
   slice(1)
 ```
 
-```{r}
+```{r, warning=FALSE}
 ignore <- c()
 for(i in 1:nrow(buff_combined)){
   buff <- buff_combined[i,]
-  if(buff$TCN == keep$TCN){
+  if(buff$TCN == keep2$TCN){
     next
   }
-  inter <- st_intersection(buff, keep)
+  inter <- st_intersection(buff, keep2)
   ggplot(inter)+
     geom_sf(fill = "pink")+
     geom_sf(data = buff, fill = "green", alpha = 0.3)
@@ -413,33 +410,35 @@ for(i in 1:nrow(buff_combined)){
 }
 ```
 
-#### Remove those from buff_combined
 ```{r}
 buff_combined <- buff_combined %>% 
   filter(!TCN %in% ignore)
 ```
 
-```{r}
+#### Map final impact area boundaries
+```{r, out.width="100%", fig.height=9}
 impact_map_filtered <- ggplot(buff_combined)+
   geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
   ggtitle("After removing overlaps")
 ```
 
 ```{r}
-grid.arrange(impact_map_full,impact_map_filtered, ncol = 2)
+grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 ```
 
+# The TCNs that will have impact area calculations are `r buff_combined$TCN`
 
-## Intersect the buffer polygons with TreeMap
+# Intersect the impact area polygons with TreeMap
 ```{r}
 for(i in 1:nrow(buff_combined)){
   shp_buff_sf <- buff_combined[i,]
   shp_buff_sf <- st_transform(shp_buff_sf, crs(tmrast))
-  shp_buff <- shp_buff_sf %>% as.polygons()
-  tm_poly_buff <- crop(tmrast, shp_buff_sf, mask = T) 
+  shp_buff <- vect(shp_buff_sf )
+  tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
+    as.polygons()
 
   # Intersect
-  intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff_sf) %>% 
+  intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff) %>% 
     st_as_sf()
     # Remove columns
   intersected_sf_buff  <- intersected_sf_buff  %>% 
@@ -450,12 +449,14 @@ for(i in 1:nrow(buff_combined)){
     mutate(area_ac = area_m/4046.8726098743) %>% 
     st_drop_geometry()
     # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", "IA_areas_", buff_combined$TCN, ".xlsx", sep = "")
+  file_name <- paste(output_dir, "/", "IA_areas_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
   print(paste("Created TreeMap Polygons for impact area of", shp_buff_sf$TCN))
 }
 ```
 
+
+### Map for one impact area to check -- remove this to speed up the script
 ```{r}
 ggplot(shp_buff_sf)+
   geom_sf()+
@@ -478,14 +479,11 @@ for (i in 1:length(shp_list)) {
   shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
 
-  # if(shp_sf$TCN %in% noFVS){
-  #   print(paste("Skipping TCN =", shp_sf$TCN))
-  #   next
-  # }
+  if(shp_sf$TCN %in% noFVS){
+    print(paste("Skipping TCN =", shp_sf$TCN))
+    next
+  }
 
-
-
-  # Now do for treatment no buffer
   tm_poly <- crop(tmrast, shp, mask = T) %>% 
     as.polygons %>% 
     makeValid()
@@ -509,14 +507,12 @@ for (i in 1:length(shp_list)) {
   write_xlsx(intersected, file_name)
   
     # Plot using ggplot2
-  map_name <- paste("map", base_name, sep = "_")
+  map_name <- as.character(shp_sf$TCN)
   map <- ggplot() +
-    #geom_sf(data = intersected_sf_buff, aes(fill = as.factor(TM_ID)), color = NA, alpha = .2) + # This slows down the script. Comment out to speed things up. 
     geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
     labs(fill = "TreeMapper ID (TM_ID)")+
     theme(legend.position = "none")+
-    geom_sf(data = shp_sf, fill = NA)+
-    geom_sf(data = shp_buff_sf, fill = NA)
+    geom_sf(data = shp_sf, fill = NA)
   
   map_list[[map_name]] <- map
   
@@ -524,7 +520,7 @@ for (i in 1:length(shp_list)) {
   shp_areas_list[[base_name]] <- st_area(shp_sf)
 
   TCN_list[[base_name]] <- shp_sf$TCN
-  st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  #st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
 
@@ -585,21 +581,20 @@ flextable(areas_table)
 
 # Maps & Overlaps
 
-
 ### Plot all treatments together and highlight overlaps
 ```{r}
 # Find overlapping areas
-overlaps <- st_intersection(combined) %>%
+overlaps <- st_intersection(combined_shp) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
   mutate(Name = "Overlap")
 
-plot_data <- bind_rows(combined, overlaps)
+plot_data <- bind_rows(combined_shp, overlaps)
 ```
 
-```{r, out.width="100%", fig.height=16}
+```{r, out.width="100%", fig.height=12}
 if(length(tcn_df)>0){
   ggplot() +
-    geom_sf(data = combined, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
+    geom_sf(data = combined_shp, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
     geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
     theme_minimal() +
     labs(title = "All TCNs -- Overlaps are darkened",
@@ -608,11 +603,20 @@ if(length(tcn_df)>0){
 }
 ```
 
-### Plot each treatment separately
+### Plot each treatment separately, except when there are identical geometries
+
 ```{r}
-for (i in seq_along(map_list)) {
-  print(names(map_list)[i])
-  print(map_list[[i]])
+map_dupes <- combined_shp %>% 
+  group_by(geometry) %>% summarize(TCNs = paste(TCN, collapse = ", ")) %>% 
+  st_drop_geometry()
+```
+
+```{r}
+for(i in 1:nrow(map_dupes)){
+  TCNs_i <- map_dupes[i, "TCNs"] %>% unlist()
+  first_TCN <- strsplit(TCNs_i, ",")[[1]][1]
+  print(paste("MAP FOR", TCNs_i))
+  print(map_list[first_TCN])
 }
 ```
 
@@ -620,9 +624,9 @@ for (i in seq_along(map_list)) {
 
 ```{r}
 # Create a pairwise intersection matrix
-overlap_list <- st_intersects(combined, sparse = F)
-rownames(overlap_list) <- combined$TCN
-colnames(overlap_list) <- combined$TCN
+overlap_list <- st_intersects(combined_shp, sparse = F)
+rownames(overlap_list) <- combined_shp$TCN
+colnames(overlap_list) <- combined_shp$TCN
 diag(overlap_list) <- FALSE
 
 # Find positions of FALSE values
@@ -640,14 +644,14 @@ result$pair_id <- apply(result, 1, function(x) paste(sort(x), collapse = "/"))
 if(nrow(result)>0){
   unique_df <- result[!duplicated(result$pair_id), c("Row", "Column")]
   for(i in 1:nrow(unique_df)){
-    print(paste(unique_df[i, 1], "overlaps with", unique_df[i, 2]))
+    #print(paste(unique_df[i, 1], "overlaps with", unique_df[i, 2]))
   }
 }
 ```
 
 ```{r}
 # Find overlapping areas
-overlaps <- st_intersection(combined) %>%
+overlaps <- st_intersection(combined_shp) %>%
   filter(n.overlaps > 1) %>%  # Keep only actual overlaps
   mutate(Name = "Overlap")
 ```
@@ -656,16 +660,16 @@ overlaps <- st_intersection(combined) %>%
 
 ```{r}
 if(length(tcn_df)>0){
-  combined$treatment_group <- sub("\\..*", "", combined$TCN)
+  combined_shp$treatment_group <- sub("\\..*", "", combined_shp$TCN)
   overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
 }
 ```
 
 ```{r}
-treatment_groups <- unique(combined$treatment_group)
+treatment_groups <- unique(combined_shp$treatment_group)
 map_list2 <- list()
 for(i in treatment_groups){
-  combined_i <- combined %>% 
+  combined_i <- combined_shp %>% 
     filter(treatment_group==i)
   overlaps_i <- overlaps %>% 
     filter(treatment_group == i) 
@@ -699,7 +703,7 @@ fvs_varloc <- st_as_sf(fvs_varloc) %>%
 ```
 
 ```{r}
-centroids <- st_centroid(combined %>% st_zm())
+centroids <- st_centroid(combined_shp %>% st_zm())
 circle_buffer <- st_buffer(centroids, dist = 5000)
 
 ggplot() +
@@ -710,5 +714,5 @@ ggplot() +
 
 ```{r}
 print(paste("FVS Variant selection is/are:"))
-unique(combined$FVSVariant)
+unique(combined_shp$FVSVariant)
 ```
