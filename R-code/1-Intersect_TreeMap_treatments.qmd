@@ -14,11 +14,11 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Lake County"
+proj_name <- "Western Klamath Fire Resilience and Forest Health Project"
 ```
 
 ```{r}
-project_ID <- "8GG24602"
+project_ID <- "8GG22624"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/8GG22624/shapefiles"
 ```
 
 
@@ -143,7 +143,7 @@ for (zip_file in zip_files) {
   unzip(zip_file, exdir = trt_dir)
 }
 
-print("All files have been extracted.")
+print("All zipped files have been extracted.")
 ```
 
 ## List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
@@ -290,18 +290,16 @@ shp_list <- lapply(shp_list, assign_fvsvariant)
 ```{r}
 for(i in 1:length(shp_list)){
   if(!"TCN" %in% names(shp_list[[i]])){
-    shp_list[[i]]$TCN <- i  
+    shp_list[[i]]$TCN <- as.numeric(i)
+  }else{
+    shp_list[[i]]$TCN <- as.numeric(shp_list[[i]]$TCN)
   }
 }
 ```
 
 ### Combine all shapefiles for mapping
 ```{r}
-combined_shp <- lapply(seq_along(shp_list), function(i) {
-  map <- shp_list[[i]]
-  map$source_id <- paste0("Layer_", i)  # Add a source ID if needed
-  map
-}) |> bind_rows()
+combined_shp <- shp_list |> bind_rows()
 
 # Ensure valid geometries
 combined_shp <- st_make_valid(combined_shp %>% st_zm)
@@ -309,10 +307,7 @@ combined_shp <- st_make_valid(combined_shp %>% st_zm)
 
 ```{r}
 ggplot(combined_shp)+
-  geom_sf(aes(fill = as.factor(TCN)), alpha = .3) +
-  geom_sf(data = combined_shp %>% filter(TCN==1.4), fill = "red", alpha = 0.7)+
-  geom_sf(data = combined_shp %>% filter(TCN==1.6), fill = "yellow", alpha = 0.7)
-
+  geom_sf(aes(fill = as.factor(TCN)), alpha = .3) 
 ```
 
 
@@ -361,79 +356,56 @@ impact_map_full <- ggplot(buff_combined)+
   ggtitle("Before removing overlaps")
 ```
 
-### For each buffer area, if half or more overlaps with other buffer areas, add it to a list called `ignore`
-
-#### Assign `keep` to the largest treatment 
+#### Make a function for assigning the largest remaining polygon to `keep` and adding any polygons that overlap >50% with it to `ignore`
 ```{r}
-keep <- buff_combined %>% 
-  mutate(trt_area = as.numeric(trt_area)) %>% 
-  filter(trt_area == max(trt_area)) %>% 
-  slice(1)
-```
-
-#### For each other polygon, add it to `ignore` if it overlaps >50% with `keep`
-```{r, warning=FALSE}
-ignore <- c()
-for(i in 1:nrow(buff_combined)){
-  buff <- buff_combined[i,]
-  if(buff$TCN == keep$TCN){
-    next
+ignore_ia <- function(){
+  keep <- buff_combined %>% 
+    filter(!TCN %in% keeps) %>% 
+    mutate(trt_area = as.numeric(trt_area)) %>% 
+    filter(trt_area == max(trt_area)) %>% 
+    slice(1)
+  if(nrow(keep)==0){
+    return("done removing overlapping impact areas")
   }
-  inter <- st_intersection(buff, keep)
-  ggplot(inter)+
-    geom_sf(fill = "pink")+
-    geom_sf(data = buff, fill = "green", alpha = 0.3)
-  if (nrow(inter) > 0) {
-      inter_area <- st_area(inter)
-      buff_area <- st_area(buff)
-      if (as.numeric(inter_area) / as.numeric(buff_area) >= 0.5) {
-        ignore <- c(ignore, buff$TCN)
-      }
+  keeps <<- c(keeps, keep$TCN)
+  print(paste("keep is", keep$TCN))
+  ignore <- c()
+  for(i in 1:nrow(buff_combined)){
+    buff <- buff_combined[i,]
+    if(buff$TCN == keep$TCN){
+      next
     }
+    inter <- st_intersection(buff, keep)
+    ggplot(inter)+
+      geom_sf(fill = "pink")+
+      geom_sf(data = buff, fill = "green", alpha = 0.3)
+    if (nrow(inter) > 0) {
+        inter_area <- st_area(inter)
+        buff_area <- st_area(buff)
+        if (as.numeric(inter_area) / as.numeric(buff_area) >= 0.5) {
+          ignore <- c(ignore, buff$TCN)
+        }
+      }
+  }
+  print(paste("ignoring", ignore))
+  buff_combined <<- buff_combined %>% 
+    filter(!TCN %in% ignore)
 }
 ```
 
-#### Remove `ignore` from `buff_combined`
-```{r}
-buff_combined <- buff_combined %>% 
-  filter(!TCN %in% ignore)
+**Important note**: Different projects will require different numbers of repetition of the below function `ignore_ia`. Feel free to add or subtract how many times this function is repeated depending on the amount of overlap between impact areas in your project.
+
+```{r, warning = F}
+keeps <- c()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
 ```
 
-#### Repeat the process with the next biggest treatment as `keep2`
-```{r}
-keep2 <- buff_combined %>% 
-  filter(!TCN == keep$TCN) %>% 
-  mutate(trt_area = as.numeric(trt_area)) %>% 
-  filter(trt_area == max(trt_area)) %>% 
-  filter(!Tactivity %in% c("Pruning", "Chipping")) %>% 
-  slice(1)
-```
-
-```{r, warning=FALSE}
-ignore <- c()
-for(i in 1:nrow(buff_combined)){
-  buff <- buff_combined[i,]
-  if(buff$TCN == keep2$TCN){
-    next
-  }
-  inter <- st_intersection(buff, keep2)
-  ggplot(inter)+
-    geom_sf(fill = "pink")+
-    geom_sf(data = buff, fill = "green", alpha = 0.3)
-  if (nrow(inter) > 0) {
-      inter_area <- st_area(inter)
-      buff_area <- st_area(buff)
-      if (as.numeric(inter_area) / as.numeric(buff_area) >= 0.5) {
-        ignore <- c(ignore, buff$TCN)
-      }
-    }
-}
-```
-
-```{r}
-buff_combined <- buff_combined %>% 
-  filter(!TCN %in% ignore)
-```
 
 #### Map final impact area boundaries
 ```{r}
@@ -642,7 +614,7 @@ for(i in 1:nrow(map_dupes)){
 }
 ```
 
-### List overlapping pairs
+### Identify overlapping pairs
 
 ```{r}
 # Create a pairwise intersection matrix
