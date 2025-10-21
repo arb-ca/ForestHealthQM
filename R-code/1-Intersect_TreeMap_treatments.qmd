@@ -234,13 +234,6 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
-
-```{r}
-for(i in 1:length(shp_list)){
-  print(paste(shp_list[[i]]$TCN, "is", shp_list[[i]]$Tobj))
-  }
-```
-
 # Overlap treatments and FVS variants
 
 ### Prep `fvs_varloc`
@@ -286,18 +279,36 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
-### Add TCN if there is none
-```{r}
+# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
+```{r, warning = FALSE}
 for(i in 1:length(shp_list)){
-  if(!"TCN" %in% names(shp_list[[i]])){
-    shp_list[[i]]$TCN <- as.numeric(i)
+  shp_i <- shp_list[[i]]
+  print(i)
+  names <- names(shp_i)
+  if(!"TCN" %in% names){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN)
   }else{
-    shp_list[[i]]$TCN <- as.numeric(shp_list[[i]]$TCN)
+    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
+  }
+  if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN %>% unique)
   }
 }
 ```
 
-### Combine all shapefiles for mapping
+# List treatment types
+```{r}
+for(i in 1:length(shp_list)){
+  print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
+}
+```
+
+
+# Combine all shapefiles for mapping
 ```{r}
 combined_shp <- shp_list |> bind_rows()
 
@@ -307,8 +318,9 @@ combined_shp <- st_make_valid(combined_shp %>% st_zm)
 
 ```{r}
 ggplot(combined_shp)+
-  geom_sf(aes(fill = as.factor(TCN)), alpha = .3) 
+  geom_sf(aes(fill = TCN), alpha = .3) 
 ```
+
 
 
 # Impact Area calculations
@@ -322,7 +334,7 @@ for (i in 1:length(shp_list)) {
   shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
 
-  if(shp_sf$TCN %in% noFVS){
+  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
     print(paste("Skipping TCN =", shp_sf$TCN))
     next
   }
@@ -345,14 +357,13 @@ for (i in 1:length(shp_list)) {
 ### Combine them and filter for fuels reduction
 ```{r}
 buff_combined <- buffers |> bind_rows() %>% 
-  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire")) %>% 
-   filter(!Tactivity %in% c("Pruning", "Chipping", "Prunning"))
+  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire"))
 ```
 
 
 ```{r}
 impact_map_full <- ggplot(buff_combined)+
-  geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
+  geom_sf(aes(fill = TCN), alpha = .3)+
   ggtitle("Before removing overlaps")
 ```
 
@@ -400,7 +411,7 @@ keeps <- c()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-# ignore_ia()
+ignore_ia()
 # ignore_ia()
 # ignore_ia()
 # ignore_ia()
@@ -410,7 +421,7 @@ ignore_ia()
 #### Map final impact area boundaries
 ```{r}
 impact_map_filtered <- ggplot(buff_combined)+
-  geom_sf(aes(fill = as.factor(TCN)), alpha = .3)+
+  geom_sf(aes(fill = TCN), alpha = .3)+
   ggtitle("After removing overlaps")
 ```
 
