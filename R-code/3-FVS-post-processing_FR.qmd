@@ -8,9 +8,9 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `FY23-24_8GG23602_Sierra_Foothill_Conservancy`
-## Treatment = `FR1`
-## Shapefile = `57520486_4_20240115.shp`
+# This run is for project `8GG24601`
+## Treatment = `3.3`
+## Shapefile = `71399131_3_3_20250110_region.shp`
 
 # Setup
 ```{r, include = F}
@@ -22,18 +22,18 @@ require(ggplot2)
 ## Define folder where the FVS outputs are located
 *Note:* Replace this for the file folder on your computer
 ```{r}
-fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
-areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/areas"
+fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output/8GG24601"
+areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 ```
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG24601_fr5_carbon.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG24601_3.3_carbon.xlsx"))
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/71399131_6_1_20250110_region_areas_TM.xlsx"))
+areas <- read_excel(paste0(areas_dir, "/8GG24601_3.3_areas.xlsx"))
 ```
 
 # Delete non-forested stands & mutate stand ID to match FVS output format

@@ -14,16 +14,16 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Western Klamath Fire Resilience and Forest Health Project"
+proj_name <- "Butte Creek"
 ```
 
 ```{r}
-project_ID <- "8GG22624"
+project_ID <- "8GG24601"
 ```
 
 ### Define impact area buffer distance, in meters
 ```{r}
-buffer_dist <- 1500
+buffer_dist <- 500
 ```
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/8GG22624/shapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles"
 ```
 
 
@@ -94,6 +94,7 @@ ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
 ```{r}
 input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
 output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
+triaads_output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/triaads_input"
 output_dir_randig <- "~/../../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
 ```
 
@@ -283,7 +284,6 @@ shp_list <- lapply(shp_list, assign_fvsvariant)
 ```{r, warning = FALSE}
 for(i in 1:length(shp_list)){
   shp_i <- shp_list[[i]]
-  print(i)
   names <- names(shp_i)
   if(!"TCN" %in% names){
     print("CREATING TCNs!")
@@ -357,7 +357,7 @@ for (i in 1:length(shp_list)) {
 ### Combine them and filter for fuels reduction
 ```{r}
 buff_combined <- buffers |> bind_rows() %>% 
-  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire"))
+  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
 ```
 
 
@@ -411,7 +411,7 @@ keeps <- c()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-ignore_ia()
+# ignore_ia()
 # ignore_ia()
 # ignore_ia()
 # ignore_ia()
@@ -429,9 +429,9 @@ impact_map_filtered <- ggplot(buff_combined)+
 grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 ```
 
-# The TCNs that will have impact area calculations are `r buff_combined$TCN`
+## The TCNs that will have impact area calculations are `r buff_combined$TCN`
 
-# Intersect the impact area polygons with TreeMap
+## Intersect the impact area polygons with TreeMap
 ```{r}
 for(i in 1:nrow(buff_combined)){
   shp_buff_sf <- buff_combined[i,]
@@ -445,16 +445,19 @@ for(i in 1:nrow(buff_combined)){
     st_as_sf()
     # Remove columns
   intersected_sf_buff  <- intersected_sf_buff  %>% 
-    select(TM_ID, FVSVariant)
+    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
   # Calculate areas
   intersected_buff  <- intersected_sf_buff  %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
     mutate(area_ac = area_m/4046.8726098743) %>% 
     st_drop_geometry()
     # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", "IA_areas_", shp_buff_sf$TCN, ".xlsx", sep = "")
+  file_name <- paste(output_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
-  print(paste("Created TreeMap Polygons for impact area of", shp_buff_sf$TCN))
+  print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
+    
+  st_write(intersected_sf_buff, triaads_output_dir, paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+
 }
 ```
 
@@ -482,7 +485,7 @@ for (i in 1:length(shp_list)) {
   shp <- vect(shp_sf)
   base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
 
-  if(shp_sf$TCN %in% noFVS){
+  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
     print(paste("Skipping TCN =", shp_sf$TCN))
     next
   }
@@ -492,25 +495,30 @@ for (i in 1:length(shp_list)) {
     makeValid()
   # Intersect
   intersected <- terra::intersect(tm_poly, shp)
-  print(paste("Created TreeMap Polygons for trt area of", base_name))
+  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
 
   # convert intersected to sf 
   intersected_sf<- sf::st_as_sf(intersected)
   
   # Remove columns
   intersected_sf <- intersected_sf %>% 
-    select(TM_ID, FVSVariant)
+    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
+  st_write(intersected_sf, triaads_output_dir, shapefile_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  # Write to shapefile
+  
   # Calculate areas
   intersected <- intersected_sf %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
     mutate(area_ac = area_m/4046.8726098743) %>% 
     st_drop_geometry()
   # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", base_name, "_areas.xlsx", sep = "")
+  file_name <- paste(output_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
   
     # Plot using ggplot2
-  map_name <- as.character(shp_sf$TCN)
+  map_name <- unique(shp_sf$TCN)
   map <- ggplot() +
     geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
     labs(fill = "TreeMapper ID (TM_ID)")+
@@ -523,7 +531,7 @@ for (i in 1:length(shp_list)) {
   shp_areas_list[[base_name]] <- st_area(shp_sf)
 
   TCN_list[[base_name]] <- shp_sf$TCN
-  #st_write(intersected_sf, output_dir, paste("intersected", base_name, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+
 }
 ```
 
@@ -554,8 +562,8 @@ shp_areas_df <- tibble(
 ```
 
 ## Do the same for TCN
-```{r}
-TCN_list <- sapply(TCN_list, mean)
+```{r, warning = F}
+TCN_list <- sapply(TCN_list, unique)
 
 tcn_df <- tibble(
   Shapefile = names(TCN_list),

@@ -14,11 +14,11 @@ format:
 
 ## Define the name and ID number of the project
 ```{r}
-proj_name <- "American FOrests Sequoia Wildfire Reforestation and Recovery Project"
+proj_name <- "Butte Creek"
 ```
 
 ```{r}
-project_ID <- "8GG20618"
+project_ID <- "8GG24601"
 ```
 
 ### Define which year of TreeMap you want to use
@@ -80,12 +80,12 @@ if(length(area_files)>0){
 # Individual impact area files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
-IA_files <- list.files(input_dir, pattern = "_areas_IA.xlsx$", full.names = TRUE)
+IA_files <- list.files(input_dir, pattern = "IA_areas", full.names = TRUE)
 if(length(IA_files)>0){
   print("Impact Area input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(IA_files)))
 } else{
-  print("***ALERT*** Missing input files with areas of each StandID ")
+  print("***ALERT*** Missing Impact Area input files with areas of each StandID ")
 }
 ```
 
@@ -268,8 +268,8 @@ for (i in 1:length(IA_files)){
              blank_tree_init = blank_tree,
              tm_tree_list = tm_trees)
   basename <- tools::file_path_sans_ext(basename(IA_files[i]))
-  basename <- gsub("_areas_IA", "", basename)
-  file <- paste0(output_dir, "/FVS_input_IA_", basename, ".xlsx")
+  basename <- gsub("areas_", "", basename)
+  file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
   write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
   print(paste("Created FVS inputs saved as", file))
 }
