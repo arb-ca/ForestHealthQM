@@ -14,7 +14,7 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Butte Creek"
+proj_name <- "Butte"
 ```
 
 ```{r}
@@ -411,10 +411,10 @@ keeps <- c()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
 ```
 
 
@@ -455,8 +455,21 @@ for(i in 1:nrow(buff_combined)){
   file_name <- paste(output_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
   print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
-    
-  st_write(intersected_sf_buff, triaads_output_dir, paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
+  st_write(intersected_sf_buff, triaads_output_dir, shp_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  # Zip that shapefile
+  shapefile_files <- list.files(
+    path = triaads_output_dir,
+    pattern = paste0("^", shp_name, "\\.(shp|shx|dbf|prj)$"),
+    full.names = TRUE
+  )
+  
+  zipfile_path <- file.path(triaads_output_dir, paste0(shp_name, ".zip"))
+  zip(zipfile_path, files = shapefile_files)
+  # Delete the original shapefile components
+  file.remove(shapefile_files)
 
 }
 ```
@@ -503,10 +516,23 @@ for (i in 1:length(shp_list)) {
   # Remove columns
   intersected_sf <- intersected_sf %>% 
     select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+  
+  # Write to shapefile
   shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
   st_write(intersected_sf, triaads_output_dir, shapefile_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
   
-  # Write to shapefile
+    # Zip that shapefile
+  shapefile_files <- list.files(
+    path = triaads_output_dir,
+    pattern = paste0("^", shapefile_name, "\\.(shp|shx|dbf|prj)$"),
+    full.names = TRUE
+  )
+  
+  zipfile_path <- file.path(triaads_output_dir, paste0(shapefile_name, ".zip"))
+  zip(zipfile_path, files = shapefile_files)
+  
+  # Delete the original shapefile components
+  file.remove(shapefile_files)
   
   # Calculate areas
   intersected <- intersected_sf %>% 
