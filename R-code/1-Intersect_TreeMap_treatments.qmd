@@ -65,7 +65,8 @@ required_packages <- c(
   "ggplot2",
   "flextable",
   "gridExtra",
-  "RColorBrewer"
+  "RColorBrewer",
+  "zip"
 )
 
 # Install missing packages
@@ -317,6 +318,15 @@ combined_shp <- st_make_valid(combined_shp %>% st_zm)
 ```
 
 ```{r}
+
+combined_shp <- combined_shp %>%
+  mutate(area = st_area(geometry)) %>%
+  arrange(desc(area))  # Largest first
+
+```
+
+
+```{r}
 ggplot(combined_shp)+
   geom_sf(aes(fill = TCN), alpha = .3) 
 ```
@@ -457,19 +467,8 @@ for(i in 1:nrow(buff_combined)){
   print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
   
   shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
+  shp_name <- gsub("\\.", "_", shp_name)
   st_write(intersected_sf_buff, triaads_output_dir, shp_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-  
-  # Zip that shapefile
-  shapefile_files <- list.files(
-    path = triaads_output_dir,
-    pattern = paste0("^", shp_name, "\\.(shp|shx|dbf|prj)$"),
-    full.names = TRUE
-  )
-  
-  zipfile_path <- file.path(triaads_output_dir, paste0(shp_name, ".zip"))
-  zip(zipfile_path, files = shapefile_files)
-  # Delete the original shapefile components
-  file.remove(shapefile_files)
 
 }
 ```
@@ -520,19 +519,6 @@ for (i in 1:length(shp_list)) {
   # Write to shapefile
   shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
   st_write(intersected_sf, triaads_output_dir, shapefile_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-  
-    # Zip that shapefile
-  shapefile_files <- list.files(
-    path = triaads_output_dir,
-    pattern = paste0("^", shapefile_name, "\\.(shp|shx|dbf|prj)$"),
-    full.names = TRUE
-  )
-  
-  zipfile_path <- file.path(triaads_output_dir, paste0(shapefile_name, ".zip"))
-  zip(zipfile_path, files = shapefile_files)
-  
-  # Delete the original shapefile components
-  file.remove(shapefile_files)
   
   # Calculate areas
   intersected <- intersected_sf %>% 
@@ -712,9 +698,15 @@ for(i in treatment_groups){
     filter(treatment_group==i)
   overlaps_i <- overlaps %>% 
     filter(treatment_group == i) 
+  
+  combined_i <- combined_i %>%
+    mutate(area = st_area(geometry)) %>%
+    arrange(desc(area))  # Largest first
+
   map <- ggplot() +
-    geom_sf(data = combined_i, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) +
-    geom_sf(data = overlaps_i, fill = "black", color = "black", alpha = 0.6) +
+    geom_sf(data = combined_i, aes(fill = as.factor(TCN)), alpha = 0.5) +
+    #geom_sf(data = overlaps_i, fill = "black", color = "black", alpha = 0.2) +
+    scale_fill_brewer(palette = "Set2") +
     theme_minimal() +
     labs(title = paste0("Treatment group ", i ,", Dark is overlap"),
          fill = "TCN", 
