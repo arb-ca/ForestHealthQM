@@ -6,5 +6,5 @@ archives/
 */FB_x64
 */test_data
 *.tif
-*data/randig-outputs/
-*data/randig-inputs/
+R-code/TRIAADS/gigafire-randig-calfire-treemap/data/randig-inputs/
+R-code/TRIAADS/gigafire-randig-calfire-treemap/data/randig-outputs/
