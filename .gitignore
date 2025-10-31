@@ -2,3 +2,6 @@
 archives/
 *.html
 .Rhistory
+*/data
+*/FB_x64
+*/test_data
