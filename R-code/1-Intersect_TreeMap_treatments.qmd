@@ -18,7 +18,7 @@ proj_name <- "Butte"
 ```
 
 ```{r}
-project_ID <- "8GG24601"
+project_ID <- "8GG24602"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24601/Shapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles"
 ```
 
 
@@ -414,10 +414,14 @@ ignore_ia <- function(){
 }
 ```
 
-**Important note**: Different projects will require different numbers of repetition of the below function `ignore_ia`. Feel free to add or subtract how many times this function is repeated depending on the amount of overlap between impact areas in your project.
+## Identify which TCNs don't need impact area calculations
+
+**Important note**: Different projects will require different numbers of repetition of the below function `ignore_ia`. Add or subtract how many times the function `ignore_ia()` is repeated until you see the message "done removing overlapping impact areas."
 
 ```{r, warning = F}
 keeps <- c()
+ignore_ia()
+ignore_ia()
 ignore_ia()
 ignore_ia()
 ignore_ia()
@@ -439,12 +443,31 @@ impact_map_filtered <- ggplot(buff_combined)+
 grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 ```
 
+#### Identify PM treatments that need impact area calculations
+```{r}
+PM_TCNs <- combined_shp %>% 
+  filter(Tobj =="Pest_Management") %>% 
+  select(TCN) %>% 
+  st_drop_geometry() %>% 
+  unlist() 
+```
+
+```{r}
+impact_list <- c(buff_combined$TCN, PM_TCNs)
+```
+
+```{r}
+buffers_final <- buff_combined <- buffers |> bind_rows() %>% 
+  filter(TCN %in% impact_list)
+```
+
+
 ## The TCNs that will have impact area calculations are `r buff_combined$TCN`
 
 ## Intersect the impact area polygons with TreeMap
 ```{r}
-for(i in 1:nrow(buff_combined)){
-  shp_buff_sf <- buff_combined[i,]
+for(i in 1:nrow(buffers_final)){
+  shp_buff_sf <- buffers_final[i,]
   shp_buff_sf <- st_transform(shp_buff_sf, crs(tmrast))
   shp_buff <- vect(shp_buff_sf )
   tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
@@ -705,10 +728,9 @@ for(i in treatment_groups){
 
   map <- ggplot() +
     geom_sf(data = combined_i, aes(fill = as.factor(TCN)), alpha = 0.5) +
-    #geom_sf(data = overlaps_i, fill = "black", color = "black", alpha = 0.2) +
     scale_fill_brewer(palette = "Set2") +
     theme_minimal() +
-    labs(title = paste0("Treatment group ", i ,", Dark is overlap"),
+    labs(title = paste0("Treatment group ", i),
          fill = "TCN", 
          col = "TCN")
   map_name <- paste("Treatment_group", i, sep = "_")
