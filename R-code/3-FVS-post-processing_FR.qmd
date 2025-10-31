@@ -8,9 +8,8 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `8GG24601`
-## Treatment = `3.3`
-## Shapefile = `71399131_3_3_20250110_region.shp`
+# This run is for project `8GG24602`
+## Treatment = `3.1`
 
 # Setup
 ```{r, include = F}
@@ -19,21 +18,27 @@ require(readxl)
 require(ggplot2)
 ```
 
-## Define folder where the FVS outputs are located
-*Note:* Replace this for the file folder on your computer
+# Define folders and variables 
+*Note:* Replace the values in this section for the file folder on your computer
+
 ```{r}
-fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output/8GG24601"
+end_year <- 2086
+```
+
+
+```{r}
+fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output/8GG24602"
 areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 ```
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG24601_3.3_carbon.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG24602_3.1_PM.xlsx"))
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/8GG24601_3.3_areas.xlsx"))
+areas <- read_excel(paste0(areas_dir, "/8GG24602_3.1_areas.xlsx"))
 ```
 
 # Delete non-forested stands & mutate stand ID to match FVS output format
@@ -91,7 +96,7 @@ ggplot(df %>% filter(MgmtID == "TRNF"))+
 # Filter to last year of project
 ```{r}
 df <- df %>% 
-  filter(Year == max(df$Year))
+  filter(Year == end_year)
 ```
 
 # Plot the distribution of ending carbon in each scenario
@@ -113,7 +118,7 @@ ggplot(df, aes(x = factor(MgmtID), y = Aboveground_Total_Live)) +
 -  Calculate total ending year carbon for each scenario
 -  Print results in the order they appear in `FRM_Calculator_Tool`
 ```{r}
-df_list <- c("TRNF", "TRWF", "BSNF", "BSWF")
+df_list <-  unique(df$MgmtID)
 # Loop through each data frame
 for (name in df_list) {
   df_i <- df %>% 
@@ -142,3 +147,18 @@ for (name in df_list) {
   
 }
 ```
+
+# Calculate the biomass of carbon removed via mechanical treatments
+
+### Sum LIVECREM and Convert to BDT
+```{r}
+if("TRNF" %in% df_list){
+  df_trnf <- df %>% 
+    filter(MgmtID=="TRNF")
+  LIVECREM <- sum(df_trnf$LIVECREM)
+  removed_BDT <- LIVECREM/0.50/0.907185
+  print(paste("Biomass removed via mechanical treatments (BDT) =", removed_BDT))
+}
+```
+
+
