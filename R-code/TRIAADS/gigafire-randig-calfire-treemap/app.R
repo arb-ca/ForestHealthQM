@@ -31,15 +31,19 @@ Mode <- function(x) {
 }
 
 ui <- fluidPage(
-  titlePanel("TRIAADS: Treatment Impact Area Analysis and Decision Support"),
+  titlePanel("TRIAADS: Treatment Impact Area Analysis and Decision Support "),
   
   tabsetPanel(
-   tabPanel("Setup & Data Preparation",
+tabPanel("Setup & Data Preparation",
   h4("Setup Parameters"),
   fileInput("treatment_file", "Upload Treatment Shapefile (zip containing .shp, .shx, .dbf)", 
             accept = c(".zip")),
-  fileInput("ia_file", "Upload Impact Area Shapefile (zip containing .shp, .shx, .dbf)", 
-            accept = c(".zip")),
+  checkboxInput("include_ia", "Include Impact Area Analysis", value = TRUE),
+  conditionalPanel(
+    condition = "input.include_ia == true",
+    fileInput("ia_file", "Upload Impact Area Shapefile (zip containing .shp, .shx, .dbf)", 
+              accept = c(".zip"))
+  ),
   textOutput("file_status"),
   numericInput("extent_expansion", 
          label = "Extent Expansion (%)", 
@@ -54,9 +58,18 @@ ui <- fluidPage(
     
  tabPanel("Prepare Landscapes & Run RANDIG",
   h4("Prepare Landscapes and Run RANDIG"),
-  fileInput("fvs_data_files", "Upload Treatment and IA Data Files (2 xlsx files)", 
+  fileInput("fvs_data_files", "Upload FVS Data Files", 
     accept = c(".xlsx", ".xls"),
     multiple = TRUE),
+  helpText(conditionalPanel(
+    condition = "input.include_ia == true",
+    "Upload 2 files: Treatment data and IA data"
+  )),
+  helpText(conditionalPanel(
+    condition = "input.include_ia == false",
+    "Upload 1 file: Treatment data only"
+  )),
+
   textOutput("file_identification_status"),
   uiOutput("year_selector"),
       # Buttons for preparing landscapes and running RANDIG
@@ -79,7 +92,7 @@ downloadButton("download_control_inputs", "Download Control Inputs (.tif)"),
       numericInput("fuel_moisture_10hr", "10-hr Dead Fuel Moisture Content (%)", value = 4, min = 2, max = 300),
       numericInput("fuel_moisture_100hr", "100-hr Dead Fuel Moisture Content (%)", value = 5, min = 2, max = 300),
       numericInput("fuel_moisture_live_herb", "Live Herbaceous Fuel Moisture Content (%)", value = 60, min = 2, max = 300),
-      numericInput("fuel_moisture_live_woody", "Live Woody Fuel Moisture Content (%)", value = 70, min = 2, max = 300),
+      numericInput("fuel_moisture_live_woody", "Live Woody Fuel Moisture Content (%)", value = 90, min = 2, max = 300),
       h4("Customize Wind Settings"),
       numericInput("wind_speed", "Wind Speed (mph)", value = 20, min = 0, max = 100),
       numericInput("wind_direction", "Wind Direction (degrees)", value = 270, min = 0, max = 360),
@@ -195,61 +208,66 @@ observeEvent(input$ia_file, {
 # Prepare Data button - create extent and render map
 
 observeEvent(input$prepare_data, {
-  req(rv$treat, rv$ia)
+  req(rv$treat)
+  # Note: rv$ia is NOT required anymore
   
   tryCatch({
     cat(file = stderr(), "Preparing data and calculating extent...\n")
     
-    # Ensure both are in EPSG:4326
+    # Ensure treatment is in EPSG:4326
     if (st_crs(rv$treat)$epsg != 4326) {
       rv$treat <- st_transform(rv$treat, crs = 4326)
     }
-    if (st_crs(rv$ia)$epsg != 4326) {
-      rv$ia <- st_transform(rv$ia, crs = 4326)
+    
+    # Handle IA if provided
+    if (input$include_ia && !is.null(rv$ia)) {
+      if (st_crs(rv$ia)$epsg != 4326) {
+        rv$ia <- st_transform(rv$ia, crs = 4326)
+      }
+      rv$buffer <- rv$ia  # Set buffer for analysis
+      
+      # Create simplified versions for plotting
+      treat_plot <- rv$treat %>% 
+        st_make_valid() %>% 
+        st_union() %>% 
+        st_buffer(dist = 0) %>%
+        st_sf()
+      
+      ia_plot <- rv$ia %>% 
+        st_make_valid() %>% 
+        st_union() %>% 
+        st_buffer(dist = 0) %>%
+        st_sf()
+      
+      # Get combined extent
+      treat_vect <- vect(rv$treat)
+      ia_vect <- vect(rv$ia)
+      treat_extent <- ext(treat_vect)
+      ia_extent <- ext(ia_vect)
+      
+      combined_extent <- ext(
+        min(treat_extent$xmin, ia_extent$xmin),
+        max(treat_extent$xmax, ia_extent$xmax),
+        min(treat_extent$ymin, ia_extent$ymin),
+        max(treat_extent$ymax, ia_extent$ymax)
+      )
+    } else {
+      # Treatment only mode
+      rv$ia <- NULL
+      rv$buffer <- NULL
+      
+      treat_plot <- rv$treat %>% 
+        st_make_valid() %>% 
+        st_union() %>% 
+        st_buffer(dist = 0) %>%
+        st_sf()
+      
+      ia_plot <- NULL
+      
+      # Use only treatment extent
+      treat_vect <- vect(rv$treat)
+      combined_extent <- ext(treat_vect)
     }
-    
-    # Create simplified versions using st_combine and extracting boundary
-    treat_combined <- rv$treat %>% 
-      st_make_valid() %>% 
-      st_geometry() %>%
-      st_combine() %>%
-      st_union()  # Apply union to the combined geometry
-    
-    # Get the outer boundary and create a new polygon from it
-    treat_plot <- treat_combined %>%
-      st_boundary() %>%  # Extract boundary lines
-      st_polygonize() %>%  # Convert back to polygon
-      st_collection_extract("POLYGON") %>%
-      st_sf()
-    
-    ia_combined <- rv$ia %>% 
-      st_make_valid() %>% 
-      st_geometry() %>%
-      st_combine() %>%
-      st_union()
-    
-    ia_plot <- ia_combined %>%
-      st_boundary() %>%
-      st_polygonize() %>%
-      st_collection_extract("POLYGON") %>%
-      st_sf()
-    
-    cat(file = stderr(), "Created simplified plotting polygons.\n")
-    
-    # Get extents separately and combine
-    treat_vect <- vect(rv$treat)
-    ia_vect <- vect(rv$ia)
-    
-    treat_extent <- ext(treat_vect)
-    ia_extent <- ext(ia_vect)
-    
-    # Create combined extent
-    combined_extent <- ext(
-      min(treat_extent$xmin, ia_extent$xmin),
-      max(treat_extent$xmax, ia_extent$xmax),
-      min(treat_extent$ymin, ia_extent$ymin),
-      max(treat_extent$ymax, ia_extent$ymax)
-    )
     
     # Calculate expanded extent
     expansion_factor <- input$extent_expansion / 100 / 2
@@ -270,22 +288,35 @@ observeEvent(input$prepare_data, {
     
     cat(file = stderr(), "Extent calculated successfully.\n")
     
-    # Render the map using simplified plotting polygons
+    # Render the map
     output$map <- renderLeaflet({
-      leaflet() %>%
+      map <- leaflet() %>%
         addProviderTiles(providers$Esri.WorldImagery) %>%
         addPolygons(data = treat_plot, color = "blue", weight = 2, 
                     fillOpacity = 0.3, fillColor = "blue",
-                    group = "Treatment", label = "Treatment Area") %>%
-        addPolygons(data = ia_plot, color = "red", weight = 2, 
-                    fillOpacity = 0.3, fillColor = "red",
-                    group = "IA", label = "Impact Area") %>%
+                    group = "Treatment", label = "Treatment Area")
+      
+      if (!is.null(ia_plot)) {
+        map <- map %>%
+          addPolygons(data = ia_plot, color = "red", weight = 2, 
+                      fillOpacity = 0.3, fillColor = "red",
+                      group = "IA", label = "Impact Area")
+      }
+      
+      map <- map %>%
         addPolygons(data = rv$ext, color = "pink", weight = 2, 
                     fillOpacity = 0.1, fillColor = "pink",
                     group = "Extent", label = "Analysis Extent")
+      
+      map
     })
     
-    output$file_status <- renderText("Data prepared successfully. Map displayed below.")
+    status_msg <- if (input$include_ia) {
+      "Data prepared successfully with Impact Area. Map displayed below."
+    } else {
+      "Data prepared successfully (Treatment only). Map displayed below."
+    }
+    output$file_status <- renderText(status_msg)
     cat(file = stderr(), "Map rendered successfully.\n")
     
   }, error = function(e) {
@@ -302,97 +333,134 @@ read_data <- function(file) {
 }
 
 # Function to identify and organize uploaded files
-identify_fvs_files <- function(uploaded_files) {
-  if (is.null(uploaded_files) || nrow(uploaded_files) != 2) {
-    return(list(error = "Please upload exactly 2 files (Treatment and IA data)"))
-  }
-  
-  file_list <- list(
-    treatment_data = NULL,
-    ia_data = NULL
-  )
-  
-  for (i in 1:nrow(uploaded_files)) {
-    filename <- tolower(uploaded_files$name[i])
-    
-    # Identify file type based on filename
-    if (grepl("_ia_", filename)) {
-      file_list$ia_data <- uploaded_files[i, ]
-    } else if (grepl("_treatment_", filename)) {
-      file_list$treatment_data <- uploaded_files[i, ]
-    } else {
-      return(list(error = paste("Could not identify file:", uploaded_files$name[i], 
-                                "(must contain '_IA_' or '_treatment_')")))
+identify_fvs_files <- function(uploaded_files, include_ia) {
+  if (include_ia) {
+    # Require 2 files
+    if (is.null(uploaded_files) || nrow(uploaded_files) != 2) {
+      return(list(error = "Please upload exactly 2 files (Treatment and IA data)"))
     }
-  }
-   if (any(sapply(file_list, is.null))) {
-    missing <- names(file_list)[sapply(file_list, is.null)]
-    return(list(error = paste("Missing files:", paste(missing, collapse = ", "))))
+    
+    file_list <- list(treatment_data = NULL, ia_data = NULL)
+    
+    for (i in 1:nrow(uploaded_files)) {
+      filename <- tolower(uploaded_files$name[i])
+      if (grepl("_ia_", filename)) {
+        file_list$ia_data <- uploaded_files[i, ]
+      } else if (grepl("_treatment_", filename)) {
+        file_list$treatment_data <- uploaded_files[i, ]
+      } else {
+        return(list(error = paste("Could not identify file:", uploaded_files$name[i])))
+      }
+    }
+    
+    if (any(sapply(file_list, is.null))) {
+      missing <- names(file_list)[sapply(file_list, is.null)]
+      return(list(error = paste("Missing files:", paste(missing, collapse = ", "))))
+    }
+    
+  } else {
+    # Require 1 file (treatment only)
+    if (is.null(uploaded_files) || nrow(uploaded_files) != 1) {
+      return(list(error = "Please upload exactly 1 file (Treatment data)"))
+    }
+    
+    file_list <- list(
+      treatment_data = uploaded_files[1, ],
+      ia_data = NULL
+    )
   }
   
   return(file_list)
 }
-# Observer to identify uploaded files
+
 observeEvent(input$fvs_data_files, {
-  cat(file = stderr(), "=== FILE UPLOAD TRIGGERED ===\n")
   req(input$fvs_data_files)
   
-  cat(file = stderr(), "Number of files uploaded:", nrow(input$fvs_data_files), "\n")
-  cat(file = stderr(), "File names:", paste(input$fvs_data_files$name, collapse = ", "), "\n")
-  
-  identified <- identify_fvs_files(input$fvs_data_files)
+  identified <- identify_fvs_files(input$fvs_data_files, input$include_ia)
   
   if (!is.null(identified$error)) {
-    cat(file = stderr(), "Error identifying files:", identified$error, "\n")
     output$file_identification_status <- renderText({
       paste("Error:", identified$error)
     })
     rv$identified_files <- NULL
   } else {
-    cat(file = stderr(), "Files identified successfully!\n")
     rv$identified_files <- identified
-    output$file_identification_status <- renderText({
-      paste("✓ Files identified successfully:",
-            "\n- Treatment Data:", identified$treatment_data$name,
-            "\n- IA Data:", identified$ia_data$name)
-    })
-    cat(file = stderr(), "rv$identified_files set, should trigger year selector observer\n")
+    if (input$include_ia) {
+      output$file_identification_status <- renderText({
+        paste("✓ Files identified successfully:",
+              "\n- Treatment Data:", identified$treatment_data$name,
+              "\n- IA Data:", identified$ia_data$name)
+      })
+    } else {
+      output$file_identification_status <- renderText({
+        paste("✓ File identified successfully:",
+              "\n- Treatment Data:", identified$treatment_data$name)
+      })
+    }
   }
 })
 
 # — 1) Dynamic Year Selector —
 # Dynamic Year Selector
+# Dynamic Year Selector
+# Dynamic Year Selector
 observe({
+  cat(file = stderr(), "=== YEAR SELECTOR OBSERVER TRIGGERED ===\n")
+  
   req(rv$identified_files)
+  cat(file = stderr(), "rv$identified_files exists\n")
+  cat(file = stderr(), "input$include_ia:", input$include_ia, "\n")
+  cat(file = stderr(), "treatment_data is null:", is.null(rv$identified_files$treatment_data), "\n")
+  cat(file = stderr(), "ia_data is null:", is.null(rv$identified_files$ia_data), "\n")
   
   tryCatch({
-    # Load both files
+    # Load treatment file (always present)
+    cat(file = stderr(), "Loading treatment data...\n")
     treatment_data <- read_data(rv$identified_files$treatment_data)
-    ia_data <- read_data(rv$identified_files$ia_data)
+    cat(file = stderr(), "Treatment data loaded. Rows:", nrow(treatment_data), "\n")
+    cat(file = stderr(), "Treatment columns:", paste(names(treatment_data), collapse = ", "), "\n")
     
-    # Check if Year column exists
+    # Check if Year column exists in treatment data
     if (!"Year" %in% names(treatment_data)) {
       stop("Treatment data does not have a 'Year' column")
     }
-    if (!"Year" %in% names(ia_data)) {
-      stop("IA data does not have a 'Year' column")
-    }
     
-    # Get years from both datasets
+    # Get years from treatment data
     treatment_years <- unique(treatment_data$Year)
-    ia_years <- unique(ia_data$Year)
+    cat(file = stderr(), "Treatment years found:", length(treatment_years), "\n")
+    cat(file = stderr(), "Treatment years:", paste(treatment_years, collapse = ", "), "\n")
     
-    # Get common years
-    if (length(treatment_years) == 0 || length(ia_years) == 0) {
-      common_years <- c()
+    # If IA data exists, get common years; otherwise just use treatment years
+    if (input$include_ia && !is.null(rv$identified_files$ia_data)) {
+      cat(file = stderr(), "Loading IA data...\n")
+      ia_data <- read_data(rv$identified_files$ia_data)
+      cat(file = stderr(), "IA data loaded. Rows:", nrow(ia_data), "\n")
+      
+      if (!"Year" %in% names(ia_data)) {
+        stop("IA data does not have a 'Year' column")
+      }
+      
+      ia_years <- unique(ia_data$Year)
+      cat(file = stderr(), "IA years found:", length(ia_years), "\n")
+      
+      if (length(treatment_years) == 0 || length(ia_years) == 0) {
+        common_years <- c()
+      } else {
+        common_years <- intersect(treatment_years, ia_years)
+      }
     } else {
-      common_years <- intersect(treatment_years, ia_years)
+      cat(file = stderr(), "Treatment only mode - using treatment years\n")
+      # Treatment only mode - use all treatment years
+      common_years <- treatment_years
     }
 
+    cat(file = stderr(), "Common years:", paste(common_years, collapse = ", "), "\n")
+
     output$year_selector <- renderUI({
+      cat(file = stderr(), "Rendering year selector UI...\n")
       if (length(common_years) == 0) {
         p(style = "color: red;", 
-          "Error: No common years found between treatment and IA data files. Please check that both files have a 'Year' column with matching values.")
+          "Error: No valid years found in the data files. Please check that files have a 'Year' column with values.")
       } else {
         selectInput(
           inputId  = "year",
@@ -403,7 +471,10 @@ observe({
       }
     })
     
+    cat(file = stderr(), "Year selector rendered\n")
+    
   }, error = function(e) {
+    cat(file = stderr(), "ERROR in year selector:", e$message, "\n")
     output$year_selector <- renderUI({
       p(style = "color: red;", paste("Error loading data:", e$message))
     })
@@ -417,7 +488,8 @@ observe({
 # Prepare Landscape Inputs
 observeEvent(input$prep_landscape, {
 
-  req(rv$identified_files, rv$ia, rv$treat, rv$ext, input$year)
+  req(rv$identified_files, rv$treat, rv$ext, input$year)
+  # Note: rv$ia is NOT required anymore
   
   output$landscape_progress <- renderText("Loading and processing input files...")
 
@@ -425,19 +497,15 @@ observeEvent(input$prep_landscape, {
     # Load FVS data
     cat("Loading FVS data files...\n")
     treatment_data <- read_data(rv$identified_files$treatment_data)
-    ia_data <- read_data(rv$identified_files$ia_data)
     
     cat("Treatment data rows:", nrow(treatment_data), "\n")
-    cat("IA data rows:", nrow(ia_data), "\n")
     cat("Treatment data columns:", paste(names(treatment_data), collapse = ", "), "\n")
-    cat("IA data columns:", paste(names(ia_data), collapse = ", "), "\n")
     
     columns_to_rasterize <- c("Fuel_Mod1", "Total_Cover", "Stratum_1_Nom_Ht", "Canopy_Ht", "Canopy_Density")
 
-    # Check if selected year is available
-    if (!(input$year %in% unique(treatment_data$Year)) || 
-        !(input$year %in% unique(ia_data$Year))) {
-      stop("Selected year is not available in both datasets.")
+    # Check if selected year is available in treatment data
+    if (!(input$year %in% unique(treatment_data$Year))) {
+      stop("Selected year is not available in treatment dataset.")
     }
     
     cat("Selected year:", input$year, "\n")
@@ -448,30 +516,8 @@ observeEvent(input$prep_landscape, {
                                    win = ext(st_transform(rv$ext, crs = "EPSG:26911")))
     cat("Landfire raster loaded successfully!\n")
 
-    # Check available MgmtIDs
+    # Check available MgmtIDs in treatment data
     cat("Treatment data MgmtIDs:", paste(unique(treatment_data$MgmtID), collapse = ", "), "\n")
-    cat("IA data MgmtIDs:", paste(unique(ia_data$MgmtID), collapse = ", "), "\n")
-
-    # Prepare IA baseline data (IANF)
-    cat("Preparing IA baseline data (IANF)...\n")
-    ia_baseline <- ia_data %>%
-      filter(MgmtID == "IANF", Removal_Code == 1, Year == input$year)
-    
-    cat("IA baseline rows after filter:", nrow(ia_baseline), "\n")
-    
-    if (nrow(ia_baseline) == 0) {
-      stop("No IA baseline data found for IANF, Removal_Code==1, Year=", input$year)
-    }
-    
-    ia_baseline <- ia_baseline %>%
-      select(all_of(c("StandID", columns_to_rasterize))) %>%
-      mutate(StandID = as.numeric(StandID),
-             Canopy_Density = Canopy_Density * 100, 
-             Canopy_Ht = Canopy_Ht * 0.304 * 10,
-             Stratum_1_Nom_Ht = Stratum_1_Nom_Ht * 0.304 * 10)
-    
-    cat("IA baseline data prepared! Rows:", nrow(ia_baseline), "\n")
-    print(head(ia_baseline))
 
     # Prepare treatment area baseline data (BSNF)
     cat("Preparing treatment baseline data (BSNF)...\n")
@@ -515,34 +561,68 @@ observeEvent(input$prep_landscape, {
     cat("Treatment scenario data prepared! Rows:", nrow(treat_scenario), "\n")
     print(head(treat_scenario))
 
-    # Transform polygons to landfire CRS
-    cat("Transforming polygons to landfire CRS...\n")
-    treat_transformed <- st_transform(rv$treat, crs = crs(landfire_stack))
-    ia_transformed <- st_transform(rv$ia, crs = crs(landfire_stack))
+    # Handle IA data if included
+    ia_baseline <- NULL
+    ia_tmid_raster <- NULL
+    
+    if (input$include_ia && !is.null(rv$identified_files$ia_data)) {
+      cat("Loading IA data file...\n")
+      ia_data <- read_data(rv$identified_files$ia_data)
+      
+      cat("IA data rows:", nrow(ia_data), "\n")
+      cat("IA data columns:", paste(names(ia_data), collapse = ", "), "\n")
+      
+      # Check if selected year is available in IA data
+      if (!(input$year %in% unique(ia_data$Year))) {
+        stop("Selected year is not available in IA dataset.")
+      }
+      
+      cat("IA data MgmtIDs:", paste(unique(ia_data$MgmtID), collapse = ", "), "\n")
+      
+      # Prepare IA baseline data (IANF)
+      cat("Preparing IA baseline data (IANF)...\n")
+      ia_baseline <- ia_data %>%
+        filter(MgmtID == "IANF", Removal_Code == 1, Year == input$year)
+      
+      cat("IA baseline rows after filter:", nrow(ia_baseline), "\n")
+      
+      if (nrow(ia_baseline) == 0) {
+        stop("No IA baseline data found for IANF, Removal_Code==1, Year=", input$year)
+      }
+      
+      ia_baseline <- ia_baseline %>%
+        select(all_of(c("StandID", columns_to_rasterize))) %>%
+        mutate(StandID = as.numeric(StandID),
+               Canopy_Density = Canopy_Density * 100, 
+               Canopy_Ht = Canopy_Ht * 0.304 * 10,
+               Stratum_1_Nom_Ht = Stratum_1_Nom_Ht * 0.304 * 10)
+      
+      cat("IA baseline data prepared! Rows:", nrow(ia_baseline), "\n")
+      print(head(ia_baseline))
+      
+      # Rasterize IA polygon
+      cat("Rasterizing IA polygon with TM_ID...\n")
+      ia_transformed <- st_transform(rv$ia, crs = crs(landfire_stack))
+      ia_tmid_raster <- rasterize(vect(ia_transformed), landfire_stack[[1]], 
+                                   field = "TM_ID")
+      cat("IA TM_ID raster created successfully!\n")
+    } else {
+      cat("Skipping IA data (treatment only mode)...\n")
+    }
 
-    # Rasterize the treatment and IA polygons using TM_ID
+    # Transform treatment polygon to landfire CRS
+    cat("Transforming treatment polygon to landfire CRS...\n")
+    treat_transformed <- st_transform(rv$treat, crs = crs(landfire_stack))
+
+    # Rasterize the treatment polygon using TM_ID
     cat("Rasterizing treatment polygon with TM_ID...\n")
     treat_tmid_raster <- rasterize(vect(treat_transformed), landfire_stack[[1]], 
                                     field = "TM_ID")
-    
-    cat("Rasterizing IA polygon with TM_ID...\n")
-    ia_tmid_raster <- rasterize(vect(ia_transformed), landfire_stack[[1]], 
-                                 field = "TM_ID")
+    cat("Treatment TM_ID raster created successfully!\n")
 
-    cat("TM_ID rasters created successfully!\n")
-
-    # Create CONTROL stack (IANF for IA, BSNF for treatment area)
+    # Create CONTROL stack (IANF for IA if present, BSNF for treatment area)
     cat("Creating control landscape stack...\n")
     control_stack <- landfire_stack
-    
-    # Rasterize IA baseline data
-    reclass_rasters_ia_baseline <- list()
-    for (i in seq_along(columns_to_rasterize)) {
-      cat("Rasterizing IA baseline column:", columns_to_rasterize[i], "\n")
-      reclass_matrix <- as.matrix(ia_baseline[, c("StandID", columns_to_rasterize[[i]])])
-      reclass_rasters_ia_baseline[[i]] <- classify(ia_tmid_raster, reclass_matrix, others = NA)
-    }
-    reclass_stack_ia_baseline <- rast(reclass_rasters_ia_baseline)
     
     # Rasterize treatment baseline data
     reclass_rasters_treat_baseline <- list()
@@ -553,11 +633,24 @@ observeEvent(input$prep_landscape, {
     }
     reclass_stack_treat_baseline <- rast(reclass_rasters_treat_baseline)
     
-    # Combine: treatment baseline for treatment area, IA baseline for IA
-    combined_control <- cover(reclass_stack_treat_baseline, reclass_stack_ia_baseline)
-    
-    # Create mask for any TM_ID
-    has_tmid_control <- !is.na(cover(treat_tmid_raster, ia_tmid_raster))
+    # If IA exists, rasterize IA baseline and combine
+    if (!is.null(ia_baseline) && !is.null(ia_tmid_raster)) {
+      reclass_rasters_ia_baseline <- list()
+      for (i in seq_along(columns_to_rasterize)) {
+        cat("Rasterizing IA baseline column:", columns_to_rasterize[i], "\n")
+        reclass_matrix <- as.matrix(ia_baseline[, c("StandID", columns_to_rasterize[[i]])])
+        reclass_rasters_ia_baseline[[i]] <- classify(ia_tmid_raster, reclass_matrix, others = NA)
+      }
+      reclass_stack_ia_baseline <- rast(reclass_rasters_ia_baseline)
+      
+      # Combine: treatment baseline for treatment area, IA baseline for IA
+      combined_control <- cover(reclass_stack_treat_baseline, reclass_stack_ia_baseline)
+      has_tmid_control <- !is.na(cover(treat_tmid_raster, ia_tmid_raster))
+    } else {
+      # Treatment only: just use treatment baseline
+      combined_control <- reclass_stack_treat_baseline
+      has_tmid_control <- !is.na(treat_tmid_raster)
+    }
     
     # Replace landfire values
     control_stack[[4:8]] <- ifel(has_tmid_control, combined_control, control_stack[[4:8]])
@@ -566,7 +659,7 @@ observeEvent(input$prep_landscape, {
     
     cat("Control landscape complete!\n")
 
-    # Create TREATMENT stack (IANF for IA, TRNF for treatment area)
+    # Create TREATMENT stack (IANF for IA if present, TRNF for treatment area)
     cat("Creating treatment landscape stack...\n")
     treat_stack <- landfire_stack
     
@@ -579,11 +672,16 @@ observeEvent(input$prep_landscape, {
     }
     reclass_stack_treat_scenario <- rast(reclass_rasters_treat_scenario)
     
-    # Combine: treatment scenario for treatment area, IA baseline for IA
-    combined_treatment <- cover(reclass_stack_treat_scenario, reclass_stack_ia_baseline)
-    
-    # Create mask for any TM_ID
-    has_tmid_treatment <- !is.na(cover(treat_tmid_raster, ia_tmid_raster))
+    # If IA exists, combine with IA baseline
+    if (!is.null(ia_baseline) && !is.null(ia_tmid_raster)) {
+      # Combine: treatment scenario for treatment area, IA baseline for IA
+      combined_treatment <- cover(reclass_stack_treat_scenario, reclass_stack_ia_baseline)
+      has_tmid_treatment <- !is.na(cover(treat_tmid_raster, ia_tmid_raster))
+    } else {
+      # Treatment only: just use treatment scenario
+      combined_treatment <- reclass_stack_treat_scenario
+      has_tmid_treatment <- !is.na(treat_tmid_raster)
+    }
     
     # Replace landfire values
     treat_stack[[4:8]] <- ifel(has_tmid_treatment, combined_treatment, treat_stack[[4:8]])
@@ -633,14 +731,18 @@ observeEvent(input$prep_landscape, {
     })
     
     # Update progress message
-    output$landscape_progress <- renderText("Landscape preparation complete.")
+    progress_msg <- if (input$include_ia) {
+      "Landscape preparation complete (with Impact Area)."
+    } else {
+      "Landscape preparation complete (Treatment only)."
+    }
+    output$landscape_progress <- renderText(progress_msg)
     cat("prep_landscape completed successfully!\n")
     
   }, error = function(e) {
     output$landscape_progress <- renderText(paste("Error:", e$message))
     output$error_message <- renderText(paste("Detailed error:", e$message))
     cat(file = stderr(), "Error in prep_landscape: ", e$message, "\n")
-    print(traceback())
   })
 })
 
@@ -752,9 +854,10 @@ output$download_randig_treatment <- downloadHandler(
               file, overwrite = TRUE)
 )  
   # Analysis function
- observeEvent(input$run_analysis, {
-  cat("\n==== RUN ANALYSIS STARTED ====\n")  # Confirm event is triggered
-  rv$buffer <- rv$ia
+# Analysis function
+observeEvent(input$run_analysis, {
+  cat("\n==== RUN ANALYSIS STARTED ====\n")
+
   tryCatch({
     # Step 1: Check if raster files exist before loading
     control_raster_path <- "./data/randig_outputs/control_RandigOutputs.tif"
@@ -768,17 +871,30 @@ output$download_randig_treatment <- downloadHandler(
     }
 
     cat("Loading raster files...\n")
-    control_outs <- mask(rast(control_raster_path),st_transform(rv$ia, crs = "EPSG:26911"))
-    treat_outs <- mask(rast(treatment_raster_path),st_transform(rv$ia, crs = "EPSG:26911"))
+    
+    # Load rasters - mask by IA if it exists, otherwise by treatment area
+    if (input$include_ia && !is.null(rv$ia)) {
+      control_outs <- mask(rast(control_raster_path), st_transform(rv$ia, crs = "EPSG:26911"))
+      treat_outs <- mask(rast(treatment_raster_path), st_transform(rv$ia, crs = "EPSG:26911"))
+      rv$buffer <- rv$ia  # Ensure buffer is set
+    } else {
+      control_outs <- mask(rast(control_raster_path), st_transform(rv$treat, crs = "EPSG:26911"))
+      treat_outs <- mask(rast(treatment_raster_path), st_transform(rv$treat, crs = "EPSG:26911"))
+      rv$buffer <- NULL
+    }
+    
     cat("Raster files loaded successfully!\n")
 
-    # Step 2: Check if spatial data (rv$treat, rv$buffer) exists
+    # Step 2: Check if spatial data exists
     if (is.null(rv$treat)) stop("ERROR: rv$treat is NULL!")
-    if (is.null(rv$buffer)) stop("ERROR: rv$buffer is NULL!")
 
     cat("Transforming spatial data...\n")
     rv$treat <- st_transform(rv$treat, crs(control_outs)) %>% st_union() %>% st_sf()
-    rv$buffer <- st_transform(rv$buffer, crs(control_outs)) %>% st_union() %>% st_sf()
+    
+    if (!is.null(rv$buffer)) {
+      rv$buffer <- st_transform(rv$buffer, crs(control_outs)) %>% st_union() %>% st_sf()
+    }
+    
     cat("Spatial data transformation complete!\n")
 
     # Step 3: Check if raster layers exist
@@ -789,119 +905,139 @@ output$download_randig_treatment <- downloadHandler(
     # Step 4: Define the areas with flame length > 8 feet
     cat("Filtering areas with flame length > 8ft...\n")
     baseline_8ft <- terra::ifel(control_outs[[8]] > 8, control_outs[[8]], NA)
-    treat_8ft <- terra::ifel(treat_outs[[8]] > 8, treat_outs[[8]], NA)
+    treatment_8ft <- terra::ifel(treat_outs[[8]] > 8, treat_outs[[8]], NA)
 
-   cat("Ensuring area calculations will work...\n")
-    if (is.null(rv$buffer) || is.null(rv$treat)) stop("ERROR: Buffer or Treatment areas are NULL!")
-    
-    cat("Calculating area total...\n")
-    area_total <- as.numeric(st_area(rv$buffer))  # Total area in square meters
-    cat("Calculating area treat...\n")
+    # Step 5: Calculate treatment area
+    cat("Calculating treatment area...\n")
     area_treatment <- as.numeric(st_area(rv$treat))
-    #if (area_total <= 0 || area_treatment <= 0) stop("ERROR: Calculated area is zero or negative!")
+    cat("Treatment Area:", area_treatment, "sq.m\n")
 
-    cat("Area calculations complete. Total Area:", area_total, "sq.m, Treatment Area:", area_treatment, "sq.m\n")
+    # Step 6: Treatment area calculations (always performed)
+    cat("Calculating treatment area metrics...\n")
+    baseline_8ft_treatmask <- mask(baseline_8ft, rv$treat)
+    treatment_8ft_treatmask <- mask(treatment_8ft, rv$treat)
 
-    # Step 6: Masking raster with buffer and treatment areas
-    cat("Applying spatial masks...\n")
-    baseline_8ft_buffmask <- mask(baseline_8ft, rv$buffer)
-    treatment_8ft_buffmask <- mask(treat_8ft, rv$buffer)
+    baseline_8ft_area_ta <- sum(!is.na(baseline_8ft_treatmask[])) * 900
+    treatment_8ft_area_ta <- sum(!is.na(treatment_8ft_treatmask[])) * 900
+    baseline_8ft_perc_ta <- baseline_8ft_area_ta / area_treatment * 100
+    treatment_8ft_perc_ta <- treatment_8ft_area_ta / area_treatment * 100
 
-    baseline_buffmask <- mask(control_outs[[8]], rv$buffer)
-    treatment_buffmask <- mask(treat_outs[[8]], rv$buffer)
+    baseline_treatmask <- mask(control_outs[[8]], rv$treat)
+    treatment_treatmask <- mask(treat_outs[[8]], rv$treat)
 
-    # Step 7: Calculate areas of high flame length (>8ft)
-    baseline_8ft_area <- sum(!is.na(baseline_8ft_buffmask[])) * 900
-    treatment_8ft_area <- sum(!is.na(treatment_8ft_buffmask[])) * 900
-    baseline_8ft_perc <- (baseline_8ft_area / area_total) * 100
-    treatment_8ft_perc <- (treatment_8ft_area / area_total) * 100
+    baseline_area_ta <- sum(!is.na(baseline_treatmask[])) * 900
+    treatment_area_ta <- sum(!is.na(treatment_treatmask[])) * 900
+    baseline_perc_ta <- baseline_area_ta / area_treatment * 100
+    treatment_perc_ta <- treatment_area_ta / area_treatment * 100
 
-    cat("Baseline Area (>8ft):", baseline_8ft_area, "sq.m\n")
-    cat("Treatment Area (>8ft):", treatment_8ft_area, "sq.m\n")
-
-    # Step 8: Compute canopy burn probability (CBP)
-   baseline_buffmask<-mask(control_outs[[8]],rv$buffer)
-  treatment_buffmask<-mask(treat_outs[[8]],rv$buffer)
-
-  baseline_area <- sum(!is.na(baseline_buffmask[])) * 900
-  treatment_area <- sum(!is.na(treatment_buffmask[])) * 900
-  baseline_perc <- baseline_area / area_total * 100
-  treatment_perc <- treatment_area / area_total * 100
-
-
-  ia_baseline_CBP_8ft <- as.numeric(global(ifel(!is.na(baseline_8ft_buffmask), control_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
-  ia_treatment_CBP_8ft <- as.numeric(global(ifel(!is.na(treatment_8ft_buffmask), treat_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
-  ia_baseline_CBP <- as.numeric(global(ifel(!is.na(baseline_buffmask), control_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
-  ia_treatment_CBP <- as.numeric(global(ifel(!is.na(treatment_buffmask), treat_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
-
-  baseline_8ft_treatmask <- mask(baseline_8ft, rv$treat)
-  treatment_8ft_treatmask <- mask(treat_8ft, rv$treat)
-
-  baseline_8ft_area_ta <- sum(!is.na(baseline_8ft_treatmask[])) * 900
-  treatment_8ft_area_ta <- sum(!is.na(treatment_8ft_treatmask[])) * 900
-  baseline_8ft_perc_ta <- baseline_8ft_area_ta / area_treatment * 100
-  treatment_8ft_perc_ta <- treatment_8ft_area_ta  / area_treatment * 100
-
-  baseline_treatmask<-mask(control_outs[[8]],rv$treat)
-  treatment_treatmask<-mask(treat_outs[[8]],rv$treat)
-
-  baseline_area_ta <- sum(!is.na(baseline_treatmask[])) * 900
-  treatment_area_ta <- sum(!is.na(treatment_treatmask[])) * 900
-  baseline_perc_ta <- baseline_area_ta / area_treatment * 100
-  treatment_perc_ta <- treatment_area_ta / area_treatment * 100
-
-  ta_baseline_CBP_8ft <- as.numeric(global(mask(ifel(!is.na(baseline_8ft_treatmask), control_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
-  ta_treatment_CBP_8ft <- as.numeric(global(mask(ifel(!is.na(treatment_8ft_treatmask), treat_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
-   ta_baseline_CBP <- as.numeric(global(mask(ifel(!is.na(baseline_treatmask), control_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
-  ta_treatment_CBP <- as.numeric(global(mask(ifel(!is.na(treatment_treatmask), treat_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
+    ta_baseline_CBP_8ft <- as.numeric(global(mask(ifel(!is.na(baseline_8ft_treatmask), control_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
+    ta_treatment_CBP_8ft <- as.numeric(global(mask(ifel(!is.na(treatment_8ft_treatmask), treat_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
+    ta_baseline_CBP <- as.numeric(global(mask(ifel(!is.na(baseline_treatmask), control_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
+    ta_treatment_CBP <- as.numeric(global(mask(ifel(!is.na(treatment_treatmask), treat_outs[[1]], NA), rv$treat), fun = "mean", na.rm = TRUE) * 100)
   
+    cat("Treatment area high severity baseline CBP:", ta_baseline_CBP_8ft, "\n")
+    cat("Treatment area high severity treatment CBP:", ta_treatment_CBP_8ft, "\n")
 
-  cat("High severity BTA:", ta_baseline_CBP_8ft , "\n")
-  cat("High severity TTA:", ta_treatment_CBP_8ft , "\n")
-  # Create the analysis data frame
-  Variables <- c(
-    "Area (acres)",
-    "Area Baseline Flame Length > 8 ft",
-    "Area Treatment Flame Length > 8ft",
-    "% Baseline Flame Length > 8 ft",
-    "% Treatment Flame Length > 8 ft",
-    "High Severity Area Baseline CBP",
-    "High Severity Area Treatment CBP",
-    "High Severity Area CBP ratio",
-    "All Burned Area Baseline CBP",
-    "All Burned Area Treatment CBP",
-    "All Burned Area CBP ratio"
-  )
-  
-Values_ia <- round(c(
-    area_total / 4046.856422,  # Convert square meters to acres
-    baseline_8ft_area/ 4046.856422,  # Convert square meters to acres
-    treatment_8ft_area / 4046.856422,  # Convert square meters to acres
-    baseline_8ft_perc,
-    treatment_8ft_perc,
-    ia_baseline_CBP_8ft,
-    ia_treatment_CBP_8ft,
-    round(ia_treatment_CBP_8ft/ia_baseline_CBP_8ft, 3),
-    ia_baseline_CBP,
-    ia_treatment_CBP,
-    round(ia_treatment_CBP/ia_baseline_CBP, 3)),2)
-  
-  Values_t <- round(c(
-    area_treatment / 4046.856422,  # Convert square meters to acres
-    baseline_8ft_area_ta / 4046.856422,  # Convert square meters to acres
-    treatment_8ft_area_ta / 4046.856422,  # Convert square meters to acres
-    baseline_8ft_perc_ta,
-    treatment_8ft_perc_ta,
-    ta_baseline_CBP_8ft,
-    ta_treatment_CBP_8ft,
-    round(ta_treatment_CBP_8ft/ta_baseline_CBP_8ft, 3),
-    ta_baseline_CBP,
-    ta_treatment_CBP,
-    round(ta_treatment_CBP/ta_baseline_CBP, 3)),2)
-  
-    rv$analysis_result <- data.frame(Variable = Variables, `Impact Area` = Values_ia, `Treated Area`=Values_t)  # Store in reactiveValues
+    # Step 7: Impact Area calculations (only if IA exists)
+    if (!is.null(rv$buffer)) {
+      cat("Calculating impact area metrics...\n")
+      
+      area_total <- as.numeric(st_area(rv$buffer))
+      cat("Impact Area:", area_total, "sq.m\n")
+      
+      # Masking raster with buffer area
+      baseline_8ft_buffmask <- mask(baseline_8ft, rv$buffer)
+      treatment_8ft_buffmask <- mask(treatment_8ft, rv$buffer)
 
+      baseline_buffmask <- mask(control_outs[[8]], rv$buffer)
+      treatment_buffmask <- mask(treat_outs[[8]], rv$buffer)
+
+      # Calculate areas of high flame length (>8ft)
+      baseline_8ft_area <- sum(!is.na(baseline_8ft_buffmask[])) * 900
+      treatment_8ft_area <- sum(!is.na(treatment_8ft_buffmask[])) * 900
+      baseline_8ft_perc <- (baseline_8ft_area / area_total) * 100
+      treatment_8ft_perc <- (treatment_8ft_area / area_total) * 100
+
+      cat("IA Baseline Area (>8ft):", baseline_8ft_area, "sq.m\n")
+      cat("IA Treatment Area (>8ft):", treatment_8ft_area, "sq.m\n")
+
+      # Compute areas burned
+      baseline_area <- sum(!is.na(baseline_buffmask[])) * 900
+      treatment_area <- sum(!is.na(treatment_buffmask[])) * 900
+      baseline_perc <- baseline_area / area_total * 100
+      treatment_perc <- treatment_area / area_total * 100
+
+      # Compute canopy burn probability (CBP) for IA
+      ia_baseline_CBP_8ft <- as.numeric(global(ifel(!is.na(baseline_8ft_buffmask), control_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
+      ia_treatment_CBP_8ft <- as.numeric(global(ifel(!is.na(treatment_8ft_buffmask), treat_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
+      ia_baseline_CBP <- as.numeric(global(ifel(!is.na(baseline_buffmask), control_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
+      ia_treatment_CBP <- as.numeric(global(ifel(!is.na(treatment_buffmask), treat_outs[[1]], NA), fun = "mean", na.rm = TRUE) * 100)
+
+      cat("IA high severity baseline CBP:", ia_baseline_CBP_8ft, "\n")
+      cat("IA high severity treatment CBP:", ia_treatment_CBP_8ft, "\n")
+    }
+
+    # Step 8: Create the analysis data frame
+    Variables <- c(
+      "Area (acres)",
+      "Area Baseline Flame Length > 8 ft",
+      "Area Treatment Flame Length > 8ft",
+      "% Baseline Flame Length > 8 ft",
+      "% Treatment Flame Length > 8 ft",
+      "High Severity Area Baseline CBP",
+      "High Severity Area Treatment CBP",
+      "High Severity Area CBP ratio",
+      "All Burned Area Baseline CBP",
+      "All Burned Area Treatment CBP",
+      "All Burned Area CBP ratio"
+    )
     
+    # Treatment area values (always calculated)
+    Values_t <- round(c(
+      area_treatment / 4046.856422,
+      baseline_8ft_area_ta / 4046.856422,
+      treatment_8ft_area_ta / 4046.856422,
+      baseline_8ft_perc_ta,
+      treatment_8ft_perc_ta,
+      ta_baseline_CBP_8ft,
+      ta_treatment_CBP_8ft,
+      round(ta_treatment_CBP_8ft / ta_baseline_CBP_8ft, 3),
+      ta_baseline_CBP,
+      ta_treatment_CBP,
+      round(ta_treatment_CBP / ta_baseline_CBP, 3)
+    ), 2)
+    
+    # Create analysis result table
+    if (!is.null(rv$buffer)) {
+      # Include Impact Area column
+      Values_ia <- round(c(
+        area_total / 4046.856422,
+        baseline_8ft_area / 4046.856422,
+        treatment_8ft_area / 4046.856422,
+        baseline_8ft_perc,
+        treatment_8ft_perc,
+        ia_baseline_CBP_8ft,
+        ia_treatment_CBP_8ft,
+        round(ia_treatment_CBP_8ft / ia_baseline_CBP_8ft, 3),
+        ia_baseline_CBP,
+        ia_treatment_CBP,
+        round(ia_treatment_CBP / ia_baseline_CBP, 3)
+      ), 2)
+      
+      rv$analysis_result <- data.frame(
+        Variable = Variables, 
+        `Impact.Area` = Values_ia, 
+        `Treated.Area` = Values_t,
+        check.names = FALSE
+      )
+    } else {
+      # Treatment only
+      rv$analysis_result <- data.frame(
+        Variable = Variables, 
+        `Treated.Area` = Values_t,
+        check.names = FALSE
+      )
+    }
 
     # Display the analysis table in the UI
     output$analysis_table <- renderDT({
@@ -911,17 +1047,18 @@ Values_ia <- round(c(
     cat("==== RUN ANALYSIS COMPLETED SUCCESSFULLY ====\n")
 
   }, error = function(e) {
-    # Print error messages if anything fails
     cat("ERROR OCCURRED: ", e$message, "\n")
+    output$error_message <- renderText(paste("Analysis error:", e$message))
   })
-output$download_csv <- downloadHandler(
-  filename = function() { "analysis_results.csv" },
-  content = function(file) {
-    req(rv$analysis_result)  # Ensure the analysis result exists
-    write.csv(rv$analysis_result, file, row.names = FALSE)
-  }
-)
-  })
+  
+  output$download_csv <- downloadHandler(
+    filename = function() { "analysis_results.csv" },
+    content = function(file) {
+      req(rv$analysis_result)
+      write.csv(rv$analysis_result, file, row.names = FALSE)
+    }
+  )
+})
 }
 
 # Helper functions
