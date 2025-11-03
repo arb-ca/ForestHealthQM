@@ -22,7 +22,7 @@ require(ggplot2)
 *Note:* Replace the values in this section for the file folder on your computer
 
 ```{r}
-end_year <- 2086
+end_year <- 2076
 ```
 
 
@@ -33,12 +33,12 @@ areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG24602_3.1_PM.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG24602_3.1_IA.xlsx"))
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/8GG24602_3.1_areas.xlsx"))
+areas <- read_excel(paste0(areas_dir, "/IA_areas_8GG24602_3.1.xlsx"))
 ```
 
 # Delete non-forested stands & mutate stand ID to match FVS output format
@@ -65,43 +65,66 @@ ggplot(df_means) +
   theme_minimal()
 ```
 
+# Plot by treatment and stand, carbon over time
 ```{r}
-ggplot(df %>% filter(MgmtID == "BSWF"))+
-  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
-  labs(
-    y = "Live Aboveground Carbon (C)") +
+if("BSWF" %in% df$MgmtID){
+  ggplot(df %>% filter(MgmtID == "BSWF"))+
+    geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+    labs(
+      y = "Live Aboveground Carbon (C)") +
+    
+    ggtitle("BSWF")
+    
+  ggplot(df %>% filter(MgmtID == "TRWF"))+
+    geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+    labs(
+      y = "Live Aboveground Carbon (C)") +
+    
+    ggtitle("TRWF")
+    
   
-  ggtitle("BSWF")
+  ggplot(df %>% filter(MgmtID == "TRNF"))+
+    geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+    labs(
+      y = "Live Aboveground Carbon (C)") +
+    
+    ggtitle("TRNF")
+
+}
 ```
 
 ```{r}
-ggplot(df %>% filter(MgmtID == "TRWF"))+
-  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
-  labs(
-    y = "Live Aboveground Carbon (C)") +
+if("BSPM" %in% df$MgmtID){
+    ggplot(df %>% filter(MgmtID == "BSPM"))+
+      geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+      labs(
+        y = "Live Aboveground Carbon (C)") +
+      
+      ggtitle("BSPM")
   
-  ggtitle("TRWF")
+    ggplot(df %>% filter(MgmtID == "TRPM"))+
+      geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+      labs(
+        y = "Live Aboveground Carbon (C)") +
+      
+      ggtitle("TRPM")
+}
 ```
 
 ```{r}
-ggplot(df %>% filter(MgmtID == "TRNF"))+
-  geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
-  labs(
-    y = "Live Aboveground Carbon (C)") +
-  
-  ggtitle("TRNF")
-```
-
-
-# Filter to last year of project
-```{r}
-df <- df %>% 
-  filter(Year == end_year)
+if("IAPM" %in% df$MgmtID){
+    ggplot(df)+
+      geom_line(aes(x = Year, y = Aboveground_Total_Live, col = StandID, group = StandID))+
+      labs(
+        y = "Live Aboveground Carbon (C)") +
+      
+      ggtitle("IAPM")
+}
 ```
 
 # Plot the distribution of ending carbon in each scenario
 ```{r}
-ggplot(df, aes(x = factor(MgmtID), y = Aboveground_Total_Live)) +
+ggplot(df %>%  filter(Year == end_year), aes(x = factor(MgmtID), y = Aboveground_Total_Live)) +
   geom_violin(fill = "lightblue", color = "black", trim = FALSE) +
   geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.5) +  # optional boxplot overlay
   labs(
@@ -110,15 +133,20 @@ ggplot(df, aes(x = factor(MgmtID), y = Aboveground_Total_Live)) +
     title = "Distribution of Total_C by MgmtID"
   ) +
   theme_minimal()
-
 ```
 
 
 # Merge with areas from pre-FVS files and calculate results
 -  Calculate total ending year carbon for each scenario
 -  Print results in the order they appear in `FRM_Calculator_Tool`
+
+
 ```{r}
 df_list <-  unique(df$MgmtID)
+```
+
+```{r}
+
 # Loop through each data frame
 for (name in df_list) {
   df_i <- df %>% 
@@ -133,31 +161,28 @@ for (name in df_list) {
   } 
 
   # Create a new column, e.g. "Biomass_Area"
-  df_i <- df_i%>% 
+  df_carbon <- df_i%>% 
+    filter(Year == end_year) %>% 
     mutate(Total_C = (Aboveground_Total_Live + Belowground_Live) * area_ac)
   
   # Save it back into the list
-  assign(name, df_i)
+  assign(name, df_carbon)
   
   # Sum carbon and label it
-  sum <- sum(df_i$Total_C)
+  sum <- sum(df_carbon$Total_C)
  
   print(paste("total C in", name, "=", round(sum, 0), "MTC"))
   assign(paste(name, "sum_C", sep = "_"), sum)
   
+  if("TRNF"==name| "TRPM" ==name){
+    df_i <- df_i %>% 
+      mutate(livecrem_MTC = LIVECREM*area_ac)    
+    livecrem_MTC <- sum(na.omit(df_i$livecrem_MTC))
+    print(paste("Carbon removed (MTC) =", round(livecrem_MTC,2)))
+    removed_BDT <- livecrem_MTC/0.50/0.907185
+    print(paste("Biomass removed via mechanical treatments (BDT) =", round(removed_BDT,2)))
 }
-```
-
-# Calculate the biomass of carbon removed via mechanical treatments
-
-### Sum LIVECREM and Convert to BDT
-```{r}
-if("TRNF" %in% df_list){
-  df_trnf <- df %>% 
-    filter(MgmtID=="TRNF")
-  LIVECREM <- sum(df_trnf$LIVECREM)
-  removed_BDT <- LIVECREM/0.50/0.907185
-  print(paste("Biomass removed via mechanical treatments (BDT) =", removed_BDT))
+  
 }
 ```
 
