@@ -1,6 +1,5 @@
 .Rproj.user/
 archives/
-*.html
 .Rhistory
 */data
 */FB_x64
@@ -8,3 +7,4 @@ archives/
 *.tif
 R-code/TRIAADS/gigafire-randig-calfire-treemap/data/randig_inputs/
 R-code/TRIAADS/gigafire-randig-calfire-treemap/data/randig_outputs/
+R-code/htmls/
