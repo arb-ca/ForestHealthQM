@@ -1,7 +1,11 @@
 ---
 title: "0-Create_Species_Lookup_Table"
-format: html
-editor: visual
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
 ---
 
 ```{r, include = F}
@@ -10,14 +14,14 @@ require(readxl)
 require(writexl)
 ```
 
-
 ### Define which year of TreeMap you want to use
+
 ```{r}
 tm_year <- 2022 # Options = 2016, 2020, 2022
 ```
 
-
 ## Load TreeMap tree tables
+
 ```{r}
 treemap_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
 trees16file <- file.path(treemap_dir, "TreeMap2016/TreeMap2016_tree_table.csv")
@@ -26,6 +30,7 @@ trees22file <- file.path(treemap_dir, "TreeMap2022/TreeMap2022_CONUS_Tree_Table.
 ```
 
 Only load the TM vintage you need because it is slow to load
+
 ```{r}
 if(tm_year == 2016){
   trees16 <- read.csv(trees16file, colClasses = c("character", "character"))
@@ -44,6 +49,7 @@ if(tm_year == 2016){
 ```
 
 # Pull out species codes and numbers
+
 ```{r}
 df <- tm_trees %>% 
   select(SPCD, COMMON_NAME, SCIENTIFIC_NAME, SPECIES_SYMBOL) %>% 
@@ -52,8 +58,8 @@ df <- tm_trees %>%
 ```
 
 # Save
+
 ```{r}
 file_name <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap/species_codes.xlsx"
 write_xlsx(df, file_name)
 ```
-
