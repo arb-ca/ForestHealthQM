@@ -14,11 +14,11 @@ format:
 ### Define the name and ID number of the project
 
 ```{r}
-proj_name <- "Butte"
+proj_name <- "Sanctuary Forest"
 ```
 
 ```{r}
-project_ID <- "8GG24602"
+project_ID <- "8GG25300"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -42,7 +42,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/Test runs/new 2025 projects/8GG24602/Shapefiles"
+trt_dir <- "~/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/"
 ```
 
 
@@ -159,8 +159,8 @@ shapefiles <- list.files(
 )
 
 shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
-shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
-shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
+#shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
+#shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
 basename(shapefiles)
 ```
 
@@ -172,6 +172,7 @@ for(i in 1:length(shapefiles)){
   shp_list[[i]] <- shp
 }
 ```
+
 
 ```{r}
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
@@ -252,6 +253,21 @@ for(i in 1:length(shp_list)){
   shp_list[[i]] <- st_transform(shp_list[[i]], st_crs(fvs_sf))
 }
 ```
+
+## Only for Lost Coast Redwood: merge the three shapefiles into one
+```{r}
+geom_list <- lapply(shp_list, st_geometry)
+all_geoms <- do.call(c, geom_list)
+merged_geom <- st_union(all_geoms)
+merged_geom <- st_cast(merged_geom, "POLYGON")
+geometry <- st_union(merged_geom)
+merged_sf <- st_sf(geometry)
+
+shp_list <- list(merged_sf)
+st_write(merged_sf, dsn = "~/CCI/QMs/Forest Health QM/QM Runs 2025/WCB/Lost Coast Redwoods/Shapefiles", layer = "merged", driver = "ESRI Shapefile", delete_layer = T)
+```
+
+
 
 ### Add FVS variant column to each shapefile
 ```{r, warning = FALSE}
@@ -335,6 +351,8 @@ ggplot(combined_shp)+
 
 # Impact Area calculations
 
+*For projects that do not include Fuels Reduction or Pest Management, this section can be removed.*
+
 ### Create buffer polygons around each treatment and mask out the treatment area
 ```{r}
 buffers <- list()
@@ -366,8 +384,12 @@ for (i in 1:length(shp_list)) {
 
 ### Combine them and filter for fuels reduction
 ```{r}
-buff_combined <- buffers |> bind_rows() %>% 
-  filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
+if("Tobj" %in% names(buffers[[1]])){
+  buff_combined <- buffers |> bind_rows() %>% 
+    filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
+} else{
+  buff_combined <- buffers |> bind_rows() 
+}
 ```
 
 
@@ -423,12 +445,12 @@ keeps <- c()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
 ```
 
 
@@ -445,15 +467,16 @@ grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 
 #### Identify PM treatments that need impact area calculations
 ```{r}
-PM_TCNs <- combined_shp %>% 
-  filter(Tobj =="Pest_Management") %>% 
-  select(TCN) %>% 
-  st_drop_geometry() %>% 
-  unlist() 
-```
-
-```{r}
-impact_list <- c(buff_combined$TCN, PM_TCNs)
+if("Tobj" %in% names(buffers[[1]])){
+  PM_TCNs <- combined_shp %>% 
+    filter(Tobj =="Pest_Management") %>% 
+    select(TCN) %>% 
+    st_drop_geometry() %>% 
+    unlist() 
+  impact_list <- c(buff_combined$TCN, PM_TCNs)
+} else{
+  impact_list <- buff_combined$TCN
+}
 ```
 
 ```{r}
@@ -480,10 +503,15 @@ for(i in 1:nrow(buffers_final)){
   intersected_sf_buff  <- intersected_sf_buff  %>% 
     select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
   # Calculate areas
+  
   intersected_buff  <- intersected_sf_buff  %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf_buff ))) %>% 
-    mutate(area_ac = area_m/4046.8726098743) %>% 
-    st_drop_geometry()
+    mutate(area_m = as.numeric(st_area(intersected_sf_buff))) %>% 
+    st_drop_geometry() %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    summarize(area_m = sum(area_m)) %>% 
+    mutate(area_ac = area_m/4046.8726098743)
+    
+
     # Write results to table and to shapefile
   file_name <- paste(output_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
@@ -546,8 +574,11 @@ for (i in 1:length(shp_list)) {
   # Calculate areas
   intersected <- intersected_sf %>% 
     mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
-    mutate(area_ac = area_m/4046.8726098743) %>% 
-    st_drop_geometry()
+    st_drop_geometry() %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    summarize(area_m = sum(area_m)) %>% 
+    mutate(area_ac = area_m/4046.8726098743)
+    
   # Write results to table and to shapefile
   file_name <- paste(output_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
@@ -762,7 +793,7 @@ circle_buffer <- st_buffer(centroids, dist = 5000)
 ggplot() +
       geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
     geom_sf(data = ca, fill = NA)+
-  geom_sf(data = circle_buffer, col = "red", fill = "red")
+   geom_sf(data = circle_buffer, col = "red", fill = "red")
 ```
 
 ```{r}
