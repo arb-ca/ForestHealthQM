@@ -9,7 +9,16 @@ format:
 ---
 
 # This uses the *average* of 2011 and 2047 FSIM 
-# This is for project emailed by Kevin on 7/31/2025
+
+```{r}
+proj_name <- "Sanctuary Forest"
+```
+
+```{r}
+project_ID <- "8GG25300"
+```
+
+# This run is for project `r project_ID`, AKA `r proj_name`
 
 ```{r, include =F}
 # Load required libraries
@@ -22,9 +31,9 @@ library(stringr)
 
 ## Load data
 
-### Shapefile
+### Original treatment shapefiles 
 ```{r}
-trt_dir = "~/CCI/QMs/Forest Health QM/Test runs/FY23-24_8GG23602_Sierra_Foothill_Conservancy/Shapefiles"
+trt_dir = "~/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/shapefile"
 ```
 
 ```{r}
@@ -93,3 +102,5 @@ for (shp_path in shp_files) {
 print(mean_results)
 
 ```
+
+This is the probability expressed as a percentage. For example, 0.07 is a 0.07% or 0.0007 probability. 

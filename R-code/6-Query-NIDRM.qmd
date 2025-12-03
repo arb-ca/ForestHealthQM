@@ -8,7 +8,7 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `Lake County Wildfire Resilience Phase 3`
+# This run is for project `Example`
 
 
 ```{r, include = F}
@@ -19,7 +19,7 @@ require(ggplot2)
 
 
 ```{r}
-project_ID <- "8GG24602"
+project_ID <- "8EX25605"
 ```
 
 For this project, the pest managemnet TCNs = 3.1, 3.2, 3.3
@@ -84,6 +84,6 @@ ggplot() +
 
 # Calculate the mean NIDRM value for the shapefile
 ```{r}
-mean(na.omit(values(shp_nidrm)))
+values(shp_nidrm) %>% na.omit() %>% mean() %>% round(2)
 ```
 

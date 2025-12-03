@@ -8,8 +8,8 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `FY23-24_8GG23626_American_Forests`
-## TCN = `3&4`
+# This run is for project `8EX25605`
+## TCN = `1.1`
 
 # Setup
 ```{r, include = F}
@@ -20,12 +20,12 @@ require(ggplot2)
 
 ## Set the acreage of your reforestation treatment
 ```{r}
-area_ac <- 400
+area_ac <- 450
 ```
 
 ### Set the end year when carbon should be tallied
 ```{r}
-end_yr <- 2105
+end_yr <- 2088
 ```
 
 
@@ -37,7 +37,7 @@ fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG23636_RF1_M1PL.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8EX25605/8EX25605_1.1.xlsx"))
 ```
 
 ```{r}
@@ -68,12 +68,9 @@ df <- df %>%
 -  Calculate total ending year carbon for each scenario
 -  Print results in the order they appear in `FRM_Calculator_Tool`
 ```{r}
-df <- df%>% 
-  mutate(Total_C = (Aboveground_Total_Live + Belowground_Live + Belowground_Dead + Standing_Dead) * area_ac)
-
-# Sum carbon and label it
-sum <- sum(df$Total_C)
-
-print(paste("total C =", round(sum, 0), "MTC"))
+df %>% 
+  group_by(MgmtID) %>% 
+  mutate(Total_C = (Aboveground_Total_Live + Belowground_Live + Belowground_Dead + Standing_Dead) * area_ac) %>% 
+  select(MgmtID, Total_C)
 ```
 
