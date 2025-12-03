@@ -12,13 +12,12 @@ format:
 *These are the things you have to edit between projects*
 
 ### Define the name and ID number of the project
-
 ```{r}
-proj_name <- "Sanctuary Forest"
+proj_name <- "Bomont CFIP"
 ```
 
 ```{r}
-project_ID <- "8GG25300"
+project_ID <- "8GG25303"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -42,9 +41,8 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/"
+trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25303 Bomont/shapefile/"
 ```
-
 
 # This run is for project `r project_ID`, AKA `r proj_name`
 
@@ -58,7 +56,7 @@ trt_dir <- "~/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Fore
 # List of required packages
 required_packages <- c(
   "terra",       
-  "tidyverse",   
+  "dplyr",   
   "readxl",      
   "sf",
   "writexl",
@@ -71,6 +69,12 @@ required_packages <- c(
 
 # Install missing packages
 missing_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+
+print("The following packages need to be installed:")
+print(missing_packages)
+
+# Set install to only use binary, so that rtools isn't needed
+
 
 if (length(missing_packages)>0) {
   install.packages(missing_packages)
@@ -93,10 +97,10 @@ ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
 ### Define input and output dir
 
 ```{r}
-input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
-output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
-triaads_output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/triaads_input"
-output_dir_randig <- "~/../../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
+input_dir <- "~/../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
+output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
+triaads_output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/triaads_input"
+output_dir_randig <- "~/../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
 ```
 
 ### Define FVS variant location shapefile
@@ -402,6 +406,9 @@ impact_map_full <- ggplot(buff_combined)+
 #### Make a function for assigning the largest remaining polygon to `keep` and adding any polygons that overlap >50% with it to `ignore`
 ```{r}
 ignore_ia <- function(){
+  if(nrow(buff_combined)==1){
+    return("only one activity; exiting from function")
+  }
   keep <- buff_combined %>% 
     filter(!TCN %in% keeps) %>% 
     mutate(trt_area = as.numeric(trt_area)) %>% 
@@ -443,8 +450,8 @@ ignore_ia <- function(){
 ```{r, warning = F}
 keeps <- c()
 ignore_ia()
-ignore_ia()
-ignore_ia()
+# ignore_ia()
+# ignore_ia()
 # ignore_ia()
 # ignore_ia()
 # ignore_ia()
@@ -467,7 +474,7 @@ grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 
 #### Identify PM treatments that need impact area calculations
 ```{r}
-if("Tobj" %in% names(buffers[[1]])){
+if("Pest_Management" %in% names(combined_shp)){
   PM_TCNs <- combined_shp %>% 
     filter(Tobj =="Pest_Management") %>% 
     select(TCN) %>% 
