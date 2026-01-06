@@ -1,5 +1,5 @@
 ---
-title: "2. Generating FVS Init from Treemap"
+title: "2. Generating FVS Inputs from Treemap"
 author: "Carmen Tubbesing"
 date: "`r Sys.Date()`"
 format: 
@@ -14,11 +14,11 @@ format:
 
 ## Define the name and ID number of the project
 ```{r}
-proj_name <- "Butte Creek"
+proj_name <- "Hughes"
 ```
 
 ```{r}
-project_ID <- "8GG24601"
+project_ID <- "8GG25301"
 ```
 
 ### Define which year of TreeMap you want to use
@@ -48,12 +48,11 @@ require(writexl)
 
 *These are the things you have to edit if it's your first time using this script*
 
-
 ### Define input and output dir
 ```{r}
-treemap_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
-input_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
-output_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Input"
+treemap_dir <- "~/../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
+input_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
+output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/FVS_Input"
 ```
 
 ### Define where to find blank FVS database
@@ -123,17 +122,6 @@ tm_trees <- tm_trees %>%
   mutate(DIA = as.numeric(DIA))
 ```
 
-Notes on the issue with NA values of TPA_UNADJ:
-    
-    - FIA STATUSCD=2 means that tree is dead 
-    - FVS HISTORY codes 1-5 mean tree is alive
-        - FVS codes 6 and 8 mean tree is dead
-    - in the LEMMA workflow, we only used History codes 1, 6, and 8. 
-    - in the LEMMA workflow, all trees had values for DBH and Ht
-    - in tm_trees,the only status codes are 1 and 2 (alive or dead)
-    - in tm_trees, all the trees with NA TPA_UNADJ are STATUSCD = 2 (dead), but not all dead trees have TPA_UNADJ = NA
-    - in tm_trees, 5% of total records have NA values of TPA_UNADJ, After removing trees with NA diameter and height, 1.5% of records have NA for TPA_UNADJ
-    
 ## Remove trees without DIA and Ht values
 ```{r}
 tm_trees <- tm_trees %>% 
@@ -202,10 +190,6 @@ tm_tree_init <- function(area_file, blank_tree_init, tm_tree_list) {
         rename(Stand_CN = PLT_CN)
     }
     
-    # Summing across values of TM_ID reduces FVS computing time. In order to sum across TM_ID 
-    # values, I have to convert TPA to tree counts across the whole area. I'm not going to do 
-    # that right now and instead stick with TPA and leave TM_ID values 
-    
     df_trees <- df_trees_full %>% 
       mutate(Stand_ID = TM_ID) %>% 
       select(Stand_CN, Stand_ID, TPA_UNADJ, STATUSCD, SPCD, DIA, HT, CR) 
@@ -229,7 +213,7 @@ tm_tree_init <- function(area_file, blank_tree_init, tm_tree_list) {
       tree_list[[col]] <- NA
     }
 
-    # Reorder columns so they match LEMMA input format
+    # Reorder columns so they match TreeMap input format
     tree_list <- tree_list %>%
       select(all_of(tree_cols))
     
@@ -258,20 +242,22 @@ for (i in 1:length(area_files)){
 
 # Build FVS inputs for impact areas
 ```{r}
-for (i in 1:length(IA_files)){
-  print(i)
-  stand_table <- tm_stand_init(area_file = IA_files[i], 
-                blank_stand_init = blank_stand, 
-                proj_name = proj_name, 
-                tm_year = tm_year) 
-  tree_table <- tm_tree_init(area_file = IA_files[i],
-             blank_tree_init = blank_tree,
-             tm_tree_list = tm_trees)
-  basename <- tools::file_path_sans_ext(basename(IA_files[i]))
-  basename <- gsub("areas_", "", basename)
-  file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
-  write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
-  print(paste("Created FVS inputs saved as", file))
+if(length(IA_files)>0){
+  for (i in 1:length(IA_files)){
+    print(i)
+    stand_table <- tm_stand_init(area_file = IA_files[i], 
+                  blank_stand_init = blank_stand, 
+                  proj_name = proj_name, 
+                  tm_year = tm_year) 
+    tree_table <- tm_tree_init(area_file = IA_files[i],
+               blank_tree_init = blank_tree,
+               tm_tree_list = tm_trees)
+    basename <- tools::file_path_sans_ext(basename(IA_files[i]))
+    basename <- gsub("areas_", "", basename)
+    file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
+    write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
+    print(paste("Created FVS inputs saved as", file))
+  }
 }
 ```
 
