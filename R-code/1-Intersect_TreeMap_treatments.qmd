@@ -602,6 +602,22 @@ for (i in 1:length(shp_list)) {
 }
 ```
 
+# Exit the script if no polygons overlap with Treemap
+
+```{r early-exit, include=FALSE}
+obj <- get0("treemap_areas_list", inherits = TRUE)
+
+if (is.null(obj)) {
+  knitr::knit_exit()
+}
+
+if (length(obj) == 0) {
+  knitr::knit_exit()
+}
+```
+
+
+
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
