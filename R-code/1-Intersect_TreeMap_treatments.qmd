@@ -13,11 +13,11 @@ format:
 
 ### Define the name and ID number of the project
 ```{r}
-proj_name <- "Bomont CFIP"
+proj_name <- "test for jason"
 ```
 
 ```{r}
-project_ID <- "8GG25303"
+project_ID <- "test"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -41,7 +41,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25303 Bomont/shapefile/"
+trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/Test runs/jason_issue/"
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -91,7 +91,7 @@ lapply(required_packages, require, character.only = TRUE)
 ### Define directory with CA perimeter shapefile in it
 
 ```{r}
-ca_dir <- "~/Reference data/CA boundary/ca-state-boundary"
+ca_dir <- "~/../OneDrive - California Air Resources Board/documents/Reference data/CA boundary/ca-state-boundary"
 ```
 
 ### Define input and output dir
@@ -177,7 +177,6 @@ for(i in 1:length(shapefiles)){
 }
 ```
 
-
 ```{r}
 print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
 ```
@@ -257,21 +256,6 @@ for(i in 1:length(shp_list)){
   shp_list[[i]] <- st_transform(shp_list[[i]], st_crs(fvs_sf))
 }
 ```
-
-## Only for Lost Coast Redwood: merge the three shapefiles into one
-```{r}
-geom_list <- lapply(shp_list, st_geometry)
-all_geoms <- do.call(c, geom_list)
-merged_geom <- st_union(all_geoms)
-merged_geom <- st_cast(merged_geom, "POLYGON")
-geometry <- st_union(merged_geom)
-merged_sf <- st_sf(geometry)
-
-shp_list <- list(merged_sf)
-st_write(merged_sf, dsn = "~/CCI/QMs/Forest Health QM/QM Runs 2025/WCB/Lost Coast Redwoods/Shapefiles", layer = "merged", driver = "ESRI Shapefile", delete_layer = T)
-```
-
-
 
 ### Add FVS variant column to each shapefile
 ```{r, warning = FALSE}
@@ -506,7 +490,13 @@ for(i in 1:nrow(buffers_final)){
   # Intersect
   intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff) %>% 
     st_as_sf()
-    # Remove columns
+  
+  if(nrow(intersected_sf_buff)==0){
+    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND TCN", shp_buff$TCN))
+    next()
+  }
+  
+  # Remove columns
   intersected_sf_buff  <- intersected_sf_buff  %>% 
     select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
   # Calculate areas
@@ -519,7 +509,7 @@ for(i in 1:nrow(buffers_final)){
     mutate(area_ac = area_m/4046.8726098743)
     
 
-    # Write results to table and to shapefile
+  # Write results to table and to shapefile (for TRIAADS)
   file_name <- paste(output_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
   print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
@@ -565,6 +555,10 @@ for (i in 1:length(shp_list)) {
     makeValid()
   # Intersect
   intersected <- terra::intersect(tm_poly, shp)
+  if(nrow(intersected)==0){
+    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
+    next()
+  }
   print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
 
   # convert intersected to sf 
