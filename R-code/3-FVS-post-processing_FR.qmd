@@ -8,38 +8,41 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `8GG24602`
-## Treatment = `3.1`
-
 # Setup
 ```{r, include = F}
-require(tidyverse)
+require(dplyr)
 require(readxl)
 require(ggplot2)
 ```
+
+# This run is for project `Hughes CFIP`
+## Treatment = `8GG25301`
+## Type = `IA`
+
 
 # Define folders and variables 
 *Note:* Replace the values in this section for the file folder on your computer
 
 ```{r}
-end_year <- 2076
+end_year <- 2077
 ```
 
 
 ```{r}
-fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output/8GG24602"
-areas_dir <- "~/../../Data_heavy_projects/Forest_QM_automation/temp"
+fvs_output_dir = "~/../Data_heavy_projects/Forest_QM_automation/FVS_Output/"
+areas_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
 ```
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG24602_3.1_IA.xlsx"))
+df <- read_excel(paste0(fvs_output_dir, "/8GG25301_IA_carbon_TRIAADS.xlsx"))
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/IA_areas_8GG24602_3.1.xlsx"))
+areas <- read_excel(paste0(areas_dir, "/IA_areas_8GG25301_1new.xlsx"))
 ```
+
 
 # Delete non-forested stands & mutate stand ID to match FVS output format
 ```{r}
@@ -154,11 +157,15 @@ for (name in df_list) {
    
   df_i <- left_join(df_i, areas, join_by(StandID==Stand_ID))
   
+  # JUST FOR MARSHALL AND SEARS
+  df_i <- df_i %>% 
+    filter(!is.na(TM_ID))
+  
   if (any(is.na(df_i$TM_ID))) {
     message("ERROR: The TM_ID column in the FVS output file and the areas file don't match.")
     message("Are you using the right areas file?")
     next()
-  } 
+  }
 
   # Create a new column, e.g. "Biomass_Area"
   df_carbon <- df_i%>% 
@@ -174,7 +181,7 @@ for (name in df_list) {
   print(paste("total C in", name, "=", round(sum, 0), "MTC"))
   assign(paste(name, "sum_C", sep = "_"), sum)
   
-  if("TRNF"==name| "TRPM" ==name){
+  if(("TRNF"==name| "TRPM" ==name) & "LIVECRM" %in% names(df_i)){
     df_i <- df_i %>% 
       mutate(livecrem_MTC = LIVECREM*area_ac)    
     livecrem_MTC <- sum(na.omit(df_i$livecrem_MTC))
