@@ -13,11 +13,11 @@ format:
 
 ### Define the name and ID number of the project
 ```{r}
-proj_name <- "test for jason"
+proj_name <- "Sanctuary Forest CFIP"
 ```
 
 ```{r}
-project_ID <- "test"
+project_ID <- "8GG25300"
 ```
 
 ### Define impact area buffer distance, in meters
@@ -41,7 +41,7 @@ tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
 ```{r}
-trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/Test runs/jason_issue/"
+trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/shapefile"
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -204,10 +204,10 @@ shp_list <- lapply(shp_list, rename_tcn_column)
 
 ### Rename objective column 
 ```{r}
-# Define possible names for the TCN column
-Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective", "Tobjective")
+# Define possible names for the treatment type/objective column
+Tobj_variants <- c("Tobj", "TreatmentO", "TObj", "TObjective", "Tobjective", "Treatment_")
 
-# Function to rename the TCN column in a single sf object
+# Function to rename the treatment column in a single sf object
 rename_Tobj_column <- function(sf_obj) {
   current_names <- names(sf_obj)
   match_name <- current_names[current_names %in% Tobj_variants]
@@ -223,10 +223,10 @@ shp_list <- lapply(shp_list, rename_Tobj_column)
 
 ### Rename Activity column 
 ```{r}
-# Define possible names for the TCN column
-Tobj_variants <- c("TActivity")
+# Define possible names for the activity column
+Tobj_variants <- c("TActivity", "Treatment")
 
-# Function to rename the TCN column in a single sf object
+# Function to rename the activity column in a single sf object
 rename_Tobj_column <- function(sf_obj) {
   current_names <- names(sf_obj)
   match_name <- current_names[current_names %in% Tobj_variants]
