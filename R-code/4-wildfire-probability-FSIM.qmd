@@ -10,12 +10,14 @@ format:
 
 # This uses the *average* of 2011 and 2047 FSIM 
 
+# TEST GIT WITH LILLIAN
+
 ```{r}
-proj_name <- "Sanctuary Forest"
+proj_name <- "Hughes CFIP"
 ```
 
 ```{r}
-project_ID <- "8GG25300"
+project_ID <- "8GG25301"
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -33,7 +35,7 @@ library(stringr)
 
 ### Original treatment shapefiles 
 ```{r}
-trt_dir = "~/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/shapefile"
+trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25301 Hughes Family Trust/shapefile/"
 ```
 
 ```{r}
@@ -45,6 +47,7 @@ shp_files <- list.files(
   full.names = TRUE
 )
 ```
+
 
 ### Wildfire probability map
 ```{r}
@@ -66,6 +69,7 @@ shp_path <- shp_files[1]
 for (shp_path in shp_files) {
   # Read shapefile
   shp <- st_read(shp_path, quiet = TRUE)
+
   shp <- st_transform(shp, st_crs(wf))
   shp <- shp %>% st_zm()
   shp_buffer <- st_buffer(shp, dist=500)
