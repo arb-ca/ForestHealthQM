@@ -8,39 +8,62 @@ format:
     toc: TRUE
 ---
 
-# Setup
+
+```{r, include = F}
+source("project_vars.R", local = TRUE)
+```
+
+```{r, include = F}
+source("treatment_vars.R", local = TRUE)
+```
+
 ```{r, include = F}
 require(dplyr)
 require(readxl)
 require(ggplot2)
 ```
 
-# This run is for project `Hughes CFIP`
-## Treatment = `8GG25301`
-## Type = `IA`
-
-
-# Define folders and variables 
-*Note:* Replace the values in this section for the file folder on your computer
-
-```{r}
-end_year <- 2077
-```
-
-
-```{r}
-fvs_output_dir = "~/../Data_heavy_projects/Forest_QM_automation/FVS_Output/"
-areas_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
-```
+## Project = `r proj_name`
+## Project ID = `r project_ID`
+## TCN = `r TCN`
+## Type = `r type`
 
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8GG25301_IA_carbon_TRIAADS.xlsx"))
+if(type == "TA"){
+  fvs_output_file <- paste(project_ID, "treatment", "carbon", sep = "_")
+  fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
+  fvs_output_file
+}
+```
+
+```{r}
+if(type == "IA"){
+  fvs_output_file <- paste(project_ID, "IA", "TRIAADS", sep = "_")
+  fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
+  fvs_output_file
+}
+```
+
+```{r}
+df <- read_excel(fvs_output_file)
 ```
 
 ## Load the data tables with areas
 ```{r}
-areas <- read_excel(paste0(areas_dir, "/IA_areas_8GG25301_1new.xlsx"))
+if(type == "TA"){
+  areas_file <- paste(project_ID, TCN, "areas", sep = "_")
+  areas_file <- paste0(temp_dir, "/", areas_file, ".xlsx")
+  areas <- read_excel(areas_file)
+}
+```
+
+```{r}
+if(type == "IA"){
+  areas_file <- paste("IA", "areas", project_ID, TCN, sep = "_")
+  areas_file <- paste0(temp_dir, "/", areas_file, ".xlsx")
+  areas <- read_excel(areas_file)
+}
 ```
 
 

@@ -10,34 +10,24 @@ format:
 
 # This uses the *average* of 2011 and 2047 FSIM 
 
-# TEST GIT WITH LILLIAN
-
-```{r}
-proj_name <- "Hughes CFIP"
+```{r, include = F}
+source("project_vars.R", local = TRUE)
 ```
 
-```{r}
-project_ID <- "8GG25301"
-```
-
-# This run is for project `r project_ID`, AKA `r proj_name`
+## Project = `r proj_name`
+## Project ID = `r project_ID`
 
 ```{r, include =F}
 # Load required libraries
 library(sf)
 library(dplyr)
 library(terra)
-library(mapview)
 library(stringr)
 ```
 
 ## Load data
 
 ### Original treatment shapefiles 
-```{r}
-trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25301 Hughes Family Trust/shapefile/"
-```
-
 ```{r}
 # List all shapefiles in nested folders
 shp_files <- list.files(
@@ -48,10 +38,8 @@ shp_files <- list.files(
 )
 ```
 
-
 ### Wildfire probability map
 ```{r}
-wf_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/FSIM/fsim_mean.tif"
 wf <- rast(wf_path)
 ```
 
@@ -104,7 +92,6 @@ for (shp_path in shp_files) {
 
 # View final table
 print(mean_results)
-
 ```
 
 This is the probability expressed as a percentage. For example, 0.07 is a 0.07% or 0.0007 probability. 

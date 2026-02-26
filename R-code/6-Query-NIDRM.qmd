@@ -7,19 +7,17 @@ format:
     embed-resources: TRUE
     toc: TRUE
 ---
+```{r, include = F}
+source("project_vars.R", local = TRUE)
+```
 
-# This run is for project `Example`
+# This run is for project `proj_name`
 
 
 ```{r, include = F}
 require(terra)
 require(sf)
 require(ggplot2)
-```
-
-
-```{r}
-project_ID <- "8EX25605"
 ```
 
 For this project, the pest managemnet TCNs = 3.1, 3.2, 3.3
@@ -40,7 +38,7 @@ plot(shp, col = "pink")
 ```{r}
 
 # Define the file path
-nidrm_path <- "C:/Users/ctubbesi/Data_heavy_projects/Forest_QM_automation/data/NIDRM/NIDRM_updated.tif"
+nidrm_path <- paste0(data_dir, "/NIDRM/NIDRM_updated.tif")
 
 # Load the raster
 nidrm <- rast(nidrm_path)

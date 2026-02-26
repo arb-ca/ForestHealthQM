@@ -8,22 +8,8 @@ format:
     toc: TRUE
 ---
 
-# User Inputs - Change these each project
-
-*These are the things you have to edit for each project*
-
-## Define the name and ID number of the project
-```{r}
-proj_name <- "Hughes"
-```
-
-```{r}
-project_ID <- "8GG25301"
-```
-
-### Define which year of TreeMap you want to use
-```{r}
-tm_year <- 2022 # Options = 2016, 2020, 2022
+```{r, include = F}
+source("project_vars.R", local = TRUE)
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -35,30 +21,13 @@ tm_year <- 2022 # Options = 2016, 2020, 2022
 ```{r, include = F}
 # load libraries
 library(terra) # for handling spatial data
-library(foreign) # for reading in database files (and other data file types)
 library(dplyr) # for data manipulation
 library(readxl) # for reading excel workbooks
-library(openxlsx) # for writing excel workbooks
 library(sf)
-library(mapview)
 require(writexl)
 ```
 
 # Setup
-
-*These are the things you have to edit if it's your first time using this script*
-
-### Define input and output dir
-```{r}
-treemap_dir <- "~/../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
-input_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
-output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/FVS_Input"
-```
-
-### Define where to find blank FVS database
-```{r}
-blank_db <- file.path(input_dir, "../FVS_files/BlankDatabase.xlsx")
-```
 
 ### Load areas files from Script 1
 
@@ -67,7 +36,7 @@ These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 # Individual treatment areas files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas"
-area_files <- list.files(input_dir, pattern = "_areas.xlsx$", full.names = TRUE)
+area_files <- list.files(temp_dir, pattern = "_areas.xlsx$", full.names = TRUE)
 if(length(area_files)>0){
   print("input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(area_files)))
@@ -79,7 +48,7 @@ if(length(area_files)>0){
 # Individual impact area files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
-IA_files <- list.files(input_dir, pattern = "IA_areas", full.names = TRUE)
+IA_files <- list.files(temp_dir, pattern = "IA_areas", full.names = TRUE)
 if(length(IA_files)>0){
   print("Impact Area input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(IA_files)))
@@ -98,15 +67,15 @@ trees22file <- file.path(treemap_dir, "TreeMap2022/TreeMap2022_CONUS_Tree_Table.
 
 Only load the TM vintage you need because it is slow to load
 ```{r}
-if(tm_year == 2016){
+if(tm == 2016){
   trees16 <- read.csv(trees16file, colClasses = c("character", "character"))
   tm_trees <- trees16 %>% 
     rename(TM_ID = tm_id)
-} else if(tm_year == 2020){
+} else if(tm == 2020){
   trees20 <- read.csv(file = trees20file, colClasses = c("character", "character"))
   tm_trees <- trees20 %>% 
     rename(TM_ID = tm_id)
-} else if(tm_year == 2022){
+} else if(tm == 2022){
   trees22 <-  read.csv(file = trees22file, colClasses = c("character", "character"))
   tm_trees <- trees22
 } else{
@@ -143,11 +112,11 @@ blank_tree <- read_excel(blank_db, sheet = "FVS_TreeInit")
 # Function to make the new stand_init table
 ```{r}
 # tm <- area_files[1] # for debugging
-tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm_year) {
+tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm) {
   #' @param tm filepath for the list of treemap IDs generated in step 1, with FVS variant column
   #' @param blank_stand_init the blank stand init
   #' @param proj_name the project name
-  #' @param tm_year the vintage of the TreeMap data you are using
+  #' @param tm the vintage of the TreeMap data you are using
   #' @return A new , filled stand init table for the AOI
   df <- read_excel(area_file) %>% 
     mutate(TM_ID = as.character(TM_ID))
@@ -157,7 +126,7 @@ tm_stand_init <- function(area_file, blank_stand_init, proj_name, tm_year) {
     mutate(STAND_ID = as.character(STAND_ID))
   stand_init <- add_row(stand_init, STAND_ID = df$TM_ID)
   stand_init$VARIANT <- df$FVSVariant #fill variant column
-  stand_init$INV_YEAR <- tm_year #fill inventory year column
+  stand_init$INV_YEAR <- tm #fill inventory year column
   stand_init$GROUPS <- "All_Stands" #fill groups column
   stand_init$PROJECT_NAME <- proj_name #fill project name column
   stand_init$INV_PLOT_SIZE <- 1 #fill inventory plot size column
@@ -228,13 +197,13 @@ for (i in 1:length(area_files)){
   stand_table <- tm_stand_init(area_file = area_files[i], 
                 blank_stand_init = blank_stand, 
                 proj_name = proj_name, 
-                tm_year = tm_year) 
+                tm = tm) 
   tree_table <- tm_tree_init(area_file = area_files[i],
              blank_tree_init = blank_tree,
              tm_tree_list = tm_trees)
   basename <- tools::file_path_sans_ext(basename(area_files[i]))
   basename <- gsub("_areas", "", basename)
-  file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
+  file <- paste0(fvs_input_dir, "/FVS_input_", basename, ".xlsx")
   write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
   print(paste("Created FVS inputs saved as", file))
 }
@@ -248,13 +217,13 @@ if(length(IA_files)>0){
     stand_table <- tm_stand_init(area_file = IA_files[i], 
                   blank_stand_init = blank_stand, 
                   proj_name = proj_name, 
-                  tm_year = tm_year) 
+                  tm = tm) 
     tree_table <- tm_tree_init(area_file = IA_files[i],
                blank_tree_init = blank_tree,
                tm_tree_list = tm_trees)
     basename <- tools::file_path_sans_ext(basename(IA_files[i]))
     basename <- gsub("areas_", "", basename)
-    file <- paste0(output_dir, "/FVS_input_", basename, ".xlsx")
+    file <- paste0(fvs_input_dir, "/FVS_input_", basename, ".xlsx")
     write_xlsx(list(FVS_StandInit=stand_table, FVS_TreeInit=tree_table), file)
     print(paste("Created FVS inputs saved as", file))
   }

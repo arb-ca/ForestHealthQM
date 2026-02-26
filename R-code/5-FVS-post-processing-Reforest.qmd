@@ -8,36 +8,29 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `8EX25605`
-## TCN = `1.1`
+# This run is for project `r proj_name`
+## TCN = `r TCN`
 
-# Setup
+```{r, include = F}
+source("project_vars.R", local = TRUE)
+```
+
+```{r, include = F}
+source("treatment_vars.R", local = TRUE)
+```
+
 ```{r, include = F}
 require(tidyverse)
 require(readxl)
 require(ggplot2)
 ```
 
-## Set the acreage of your reforestation treatment
-```{r}
-area_ac <- 450
-```
-
-### Set the end year when carbon should be tallied
-```{r}
-end_yr <- 2088
-```
-
-
-## Define folder where the FVS outputs are located
-*Note:* Replace this for the file folder on your computer
-```{r}
-fvs_output_dir = "~/../../Data_heavy_projects/Forest_QM_automation/FVS_Output"
-```
-
 ## Load the FVS output files
 ```{r}
-df <- read_excel(paste0(fvs_output_dir, "/8EX25605/8EX25605_1.1.xlsx"))
+fvs_output_file <- paste(project_ID, TCN, "RF", sep = "_")
+fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
+fvs_output_file
+df <- read_excel(fvs_output_file)
 ```
 
 ```{r}

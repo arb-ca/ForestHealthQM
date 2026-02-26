@@ -7,41 +7,9 @@ format:
     embed-resources: TRUE
     toc: TRUE
 ---
-# User Inputs - Change these each project
 
-*These are the things you have to edit between projects*
-
-### Define the name and ID number of the project
-```{r}
-proj_name <- "Sanctuary Forest CFIP"
-```
-
-```{r}
-project_ID <- "8GG25300"
-```
-
-### Define impact area buffer distance, in meters
-```{r}
-buffer_dist <- 500
-```
-
-### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
-
-List the TCNs of treatments not needing FVS input files
-```{r}
-noFVS <- c()
-```
-
-Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
-
-### Define which year of TreeMap you want to use
-```{r}
-tm <- 2022 # Options = 2016, 2020, 2022
-```
-
-## Define directory with treatment shapefiles in it
-```{r}
-trt_dir <- "~/../OneDrive - California Air Resources Board/documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/shapefile"
+```{r, include = F}
+source("project_vars.R", local = TRUE)
 ```
 
 # This run is for project `r project_ID`, AKA `r proj_name`
@@ -64,7 +32,8 @@ required_packages <- c(
   "flextable",
   "gridExtra",
   "RColorBrewer",
-  "zip"
+  "zip",
+  "openxlsx"
 )
 
 # Install missing packages
@@ -84,42 +53,22 @@ if (length(missing_packages)>0) {
 lapply(required_packages, require, character.only = TRUE)
 ```
 
-# Setup
-
-*These are the things you have to edit if it's your first time using this script*
-
-### Define directory with CA perimeter shapefile in it
-
+# Load FVS variants map
 ```{r}
-ca_dir <- "~/../OneDrive - California Air Resources Board/documents/Reference data/CA boundary/ca-state-boundary"
-```
-
-### Define input and output dir
-
-```{r}
-input_dir <- "~/../Data_heavy_projects/Forest_QM_automation/data/TreeMap"
-output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/temp"
-triaads_output_dir <- "~/../Data_heavy_projects/Forest_QM_automation/triaads_input"
-output_dir_randig <- "~/../Data_heavy_projects/Forest_QM_automation/randig_shapefiles"
-```
-
-### Define FVS variant location shapefile
-
-```{r}
-fvs_varloc_shp_path <- file.path(input_dir, "../../FVS_files/FVSVariantMap20210525/FVS_Variants_and_Locations.shp")
 fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 ```
 
-### Clear output directory (`temp`)
+
+### Clear temp directory (`temp`)
 ```{r}
-unlink(paste0(output_dir, "/*"), recursive = TRUE)
+unlink(paste0(temp_dir, "/*"), recursive = TRUE)
 ```
 
 ### Read in TreeMap dataset(s)
 ```{r}
-tm16file <- file.path(input_dir, "TreeMap2016/tm2016_ca/tm2016_ca.tif") 
-tm20file <- file.path(input_dir, "TreeMap2020/tm2020_ca/TM2020_CA.tif")
-tm22file <- file.path(input_dir, "TreeMap2022/tm2022_ca.tif")
+tm16file <- file.path(treemap_dir, "TreeMap2016/tm2016_ca/tm2016_ca.tif") 
+tm20file <- file.path(treemap_dir, "TreeMap2020/tm2020_ca/TM2020_CA.tif")
+tm22file <- file.path(treemap_dir, "TreeMap2022/tm2022_ca.tif")
 ```
 
 ```{r}
@@ -510,7 +459,7 @@ for(i in 1:nrow(buffers_final)){
     
 
   # Write results to table and to shapefile (for TRIAADS)
-  file_name <- paste(output_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
+  file_name <- paste(temp_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
   print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
   
@@ -581,7 +530,7 @@ for (i in 1:length(shp_list)) {
     mutate(area_ac = area_m/4046.8726098743)
     
   # Write results to table and to shapefile
-  file_name <- paste(output_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
+  file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
   
     # Plot using ggplot2
