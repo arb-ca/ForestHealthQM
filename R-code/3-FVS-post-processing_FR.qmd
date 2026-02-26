@@ -8,7 +8,6 @@ format:
     toc: TRUE
 ---
 
-
 ```{r, include = F}
 source("project_vars.R", local = TRUE)
 ```
@@ -211,6 +210,8 @@ for (name in df_list) {
     print(paste("Carbon removed (MTC) =", round(livecrem_MTC,2)))
     removed_BDT <- livecrem_MTC/0.50/0.907185
     print(paste("Biomass removed via mechanical treatments (BDT) =", round(removed_BDT,2)))
+  } else if(("TRNF"==name| "TRPM" ==name) & !("LIVECRM" %in% names(df_i))){
+  print("no biomass removed via mechanical treatments ('BR')")
 }
   
 }
