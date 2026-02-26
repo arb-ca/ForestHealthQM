@@ -1,5 +1,7 @@
-proj_name <- "Sanctuary Forest CFIP"
-project_ID <- "8GG25300"
+# HI JASON
+
+proj_name <- "Cole and Evans"
+project_ID <- "8GG25305"
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 noFVS <- c()
@@ -9,7 +11,8 @@ noFVS <- c()
 tm <- 2022 # Options = 2016, 2020, 2022
 
 ## Define directory with treatment shapefiles in it
-trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25300 Sanctuary Forest CFIP/shapefile"
+## This can be located anywhere on your computer. It doesn't need to be in the same folder as this code
+trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/QM Runs 2025/CFIP/8GG25305 Cole and Evans/shapefile"
 
 ### Define "data" directory 
 data_dir <- "../../data"
