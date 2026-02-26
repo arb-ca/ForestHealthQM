@@ -465,8 +465,16 @@ for(i in 1:nrow(buffers_final)){
   
   shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
   shp_name <- gsub("\\.", "_", shp_name)
-  st_write(intersected_sf_buff, triaads_output_dir, shp_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-
+  st_write(obj = intersected_sf_buff, dsn = paste0(shp_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  # Zip the shapefiles for easier import into TRIAADS
+  zip_files <- list.files(full.names = TRUE, recursive = T)
+  zip_files <- zip_files[grepl(shp_name, basename(zip_files), ignore.case = TRUE)]
+  zip_files <- gsub("^\\./", "", zip_files)
+ 
+  zip_name <- paste0(triaads_output_dir,"/", shp_name, ".zip")
+  zip(zipfile = zip_name, files = zip_files)
+  file.remove(zip_files)
 }
 ```
 
@@ -519,7 +527,18 @@ for (i in 1:length(shp_list)) {
   
   # Write to shapefile
   shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
-  st_write(intersected_sf, triaads_output_dir, shapefile_name, driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+   
+  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  
+  # Zip the shapefiles for easier import into TRIAADS
+  zip_files <- list.files(full.names = TRUE, recursive = T)
+  zip_files <- zip_files[grepl(shapefile_name, basename(zip_files), ignore.case = TRUE)]
+  zip_files <- gsub("^\\./", "", zip_files)
+ 
+  zip_name <- paste0(triaads_output_dir,"/", shapefile_name, ".zip")
+  zip(zipfile = zip_name, files = zip_files)
+  file.remove(zip_files)
   
   # Calculate areas
   intersected <- intersected_sf %>% 
