@@ -1,4 +1,4 @@
 
 library(shiny)
-runApp("../../TRIAADS/gigafire-randig-calfire-lemma")
+runApp("TRIAADS/gigafire-randig-calfire-treemap")
 
