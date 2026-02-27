@@ -48,6 +48,30 @@ if(type == "IA"){
 df <- read_excel(fvs_output_file)
 ```
 
+# Plot carbon over time for all stands, all runs 
+
+This is similar to what FVS shows if you choose "wait for run." Code written by Jason Singh with help from copilot.
+```{r}
+df <- df %>%
+  mutate(Total_Carbon = Aboveground_Total_Live + Belowground_Live)
+# Plot total carbon
+ggplot(df, aes(x = Year, y = Total_Carbon, color = as.factor(StandID), group = StandID)) +
+  geom_line() +
+  facet_wrap(~ MgmtID, ncol = 2) +
+  labs(x = "Year",
+       y = "Total Carbon",
+       color = "StandID") +
+  scale_color_manual(values = rainbow(length(unique(df$StandID)))) +
+  theme_light() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1),
+        strip.text = element_text(color = "#000000"),
+        axis.text = element_text(color = "#000000"))
+
+# Save output file
+ggsave("Total_C_Graph.png", width = 6, height = 6, units = "in")
+```
+
 ## Load the data tables with areas
 ```{r}
 if(type == "TA"){
@@ -66,6 +90,7 @@ if(type == "IA"){
 ```
 
 
+
 # Delete non-forested stands & mutate stand ID to match FVS output format
 ```{r}
 areas <- areas %>% 
@@ -80,6 +105,7 @@ df_means <- df %>%
 df_means <- df_means %>% 
   ungroup()
 ```
+
 
 
 ```{r}
