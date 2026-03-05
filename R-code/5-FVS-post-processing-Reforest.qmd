@@ -8,9 +8,6 @@ format:
     toc: TRUE
 ---
 
-# This run is for project `r proj_name`
-## TCN = `r TCN`
-
 ```{r, include = F}
 source("project_vars.R", local = TRUE)
 ```
@@ -18,6 +15,9 @@ source("project_vars.R", local = TRUE)
 ```{r, include = F}
 source("treatment_vars.R", local = TRUE)
 ```
+
+# This run is for project `r proj_name`
+## TCN = `r TCN`
 
 ```{r, include = F}
 require(tidyverse)
@@ -28,7 +28,7 @@ require(ggplot2)
 ## Load the FVS output files
 ```{r}
 fvs_output_file <- paste(project_ID, TCN, "RF", sep = "_")
-fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
+fvs_output_file <- paste0(fvs_output_dir, project_ID, "/", fvs_output_file, ".xlsx")
 fvs_output_file
 df <- read_excel(fvs_output_file)
 ```
@@ -54,7 +54,7 @@ ggplot(df_means) +
 # Filter to last year of project
 ```{r}
 df <- df %>% 
-  filter(Year == end_yr)
+  filter(Year == end_year)
 ```
 
 # Multiply by acres and calculate results

@@ -8,8 +8,6 @@ format:
     toc: TRUE
 ---
 
-## TEST FOR KEVIN
-
 ```{r, include = F}
 source("project_vars.R", local = TRUE)
 ```
