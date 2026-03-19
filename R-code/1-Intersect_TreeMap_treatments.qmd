@@ -61,7 +61,7 @@ fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 
 ### Clear temp directory (`temp`)
 ```{r}
-unlink(paste0(temp_dir, "/*"), recursive = TRUE)
+#unlink(paste0(temp_dir, "/*"), recursive = TRUE)
 ```
 
 ### Read in TreeMap dataset(s)
@@ -123,6 +123,7 @@ shp_list <- list()
 for(i in 1:length(shapefiles)){
   shp <- st_read(shapefiles[i], quiet= T) %>% st_zm()
   shp_list[[i]] <- shp
+  shp_list[[i]]$Grant_ID <- as.character(project_ID)
 }
 ```
 
@@ -259,6 +260,20 @@ for(i in 1:length(shp_list)){
 for(i in 1:length(shp_list)){
   print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
 }
+```
+
+# Convert GrantID and VegType to character in all elements of shp_list if they exist
+```{r}
+shp_list <- lapply(shp_list, function(df) {
+  if ("GrantID" %in% names(df)) {
+    df <- df %>% mutate(GrantID = as.character(GrantID))
+  }
+  if ("VegType" %in% names(df)) {
+    df <- df %>% mutate(VegType = as.character(VegType))
+  }
+  return(df)
+})
+
 ```
 
 

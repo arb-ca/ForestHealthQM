@@ -23,8 +23,8 @@ source("project_vars.R", local = TRUE)
 library(terra) # for handling spatial data
 library(dplyr) # for data manipulation
 library(readxl) # for reading excel workbooks
-library(sf)
-require(writexl)
+library(sf) # for shapefiles
+require(writexl) # for saving excel files
 ```
 
 # Setup
@@ -35,8 +35,8 @@ These files were created by the script `1-Intersect_TreeMap_treatments.qmd`
 
 # Individual treatment areas files 
 ```{r}
-# list the excel files in inputs_dir that end with "_areas"
-area_files <- list.files(temp_dir, pattern = "_areas.xlsx$", full.names = TRUE)
+# list the excel files in temp_dir that end with "_areas"
+area_files <- list.files(temp_dir, pattern = paste0("^", project_ID, ".*_areas\\.xlsx$"), full.names = TRUE)
 if(length(area_files)>0){
   print("input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(area_files)))
@@ -48,7 +48,7 @@ if(length(area_files)>0){
 # Individual impact area files 
 ```{r}
 # list the excel files in inputs_dir that end with "_areas_TM"
-IA_files <- list.files(temp_dir, pattern = "IA_areas", full.names = TRUE)
+IA_files <- list.files(temp_dir, pattern = paste0("^IA_areas_", project_ID, "_.*"), full.names = TRUE)
 if(length(IA_files)>0){
   print("Impact Area input files with areas of each StandID are:")
   print(tools::file_path_sans_ext(basename(IA_files)))
