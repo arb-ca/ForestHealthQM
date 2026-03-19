@@ -53,11 +53,38 @@ if (length(missing_packages)>0) {
 lapply(required_packages, require, character.only = TRUE)
 ```
 
+# Create necessary folders if they don't already exist
+```{r}
+if (!dir.exists("../../temp")) {
+  dir.create("../../temp")
+}
+if (!dir.exists("../../FVS_Input")) {
+  dir.create("../../FVS_Input")
+}
+if (!dir.exists("../../FVS_Output")) {
+  dir.create("../../FVS_Output")
+}
+if (!dir.exists("../../triaads_input")) {
+  dir.create("../../triaads_input")
+}
+
+if (!dir.exists("TRIAADS/gigafire-randig-calfire-treemap/data/base_data")) {
+  dir.create("TRIAADS/gigafire-randig-calfire-treemap/data/base_data")
+}
+
+if (!dir.exists("TRIAADS/gigafire-randig-calfire-treemap/data/randig_inputs")) {
+  dir.create("TRIAADS/gigafire-randig-calfire-treemap/data/randig_inputs")
+}
+
+if (!dir.exists("TRIAADS/gigafire-randig-calfire-treemap/data/randig_outputs")) {
+  dir.create("TRIAADS/gigafire-randig-calfire-treemap/data/randig_outputs")
+}
+```
+
 # Load FVS variants map
 ```{r}
 fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 ```
-
 
 ### Clear temp directory (`temp`)
 ```{r}
