@@ -823,7 +823,11 @@ ggplot() +
    geom_sf(data = circle_buffer, col = "red", fill = "red")
 ```
 
+# Important info for FVS runs:
 ```{r}
-print(paste("FVS Variant selection is/are:"))
-unique(combined_shp$FVSVariant)
+flextable(areas_table)
 ```
+
+## FVS Variant  selection is/are `r unique(combined_shp$FVSVariant)`
+
+## The TCNs that will have impact area calculations are `r buff_combined$TCN`

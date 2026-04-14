@@ -38,7 +38,7 @@ if(type == "TA"){
 
 ```{r}
 if(type == "IA"){
-  fvs_output_file <- paste0(project_ID, "/", project_ID, "_IA", "_TRIAADS")
+  fvs_output_file <- paste0(project_ID, "/", project_ID, "_", TCN, "_IA", "_TRIAADS")
   fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
   fvs_output_file
 }
