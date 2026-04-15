@@ -128,7 +128,7 @@ for (zip_file in zip_files) {
 print("All zipped files have been extracted.")
 ```
 
-## List shapefiles in `trt_dir`, ignoring those with "buffer" or "boundary" in the name
+## List shapefiles in `trt_dir`
 
 ```{r}
 shapefiles <- list.files(
@@ -139,10 +139,25 @@ shapefiles <- list.files(
 )
 
 shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
+
+bn <- basename(shapefiles)
+```
+
+### Remove duplicates
+```{r}
+shapefiles <- shapefiles[!duplicated(bn)]
+```
+
+
+
+### Remove shapefiles with "boundary" in the name because these are often project boundaries rather than individual treatment polygons
+
+You may need to comment out these lines if your treatment polygons have "boundary" in their name.
+```{r}
 #shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
 #shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
-basename(shapefiles)
 ```
+
 
 ## Create shp_list
 ```{r}

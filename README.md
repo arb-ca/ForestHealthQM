@@ -72,10 +72,12 @@ Use these selections in FVS when instructed in the procedures below.
 ### 1. Prepare files
 
 - Prepare project shapefiles
-  - There should be one shapefile for each treatment activity. Assign
-    each activity a Treatment Component Number (TCN). Each shapefile
-    must have a field in its attribute table called “TCN” that contains
-    the TCN of the activity.
+  - There should be one shapefile for each treatment activity. All the
+    shapefiles for one project should be in the same folder, but
+    individual shapefiles may be in subfolders within that. Shapefile
+    names *must be unique* – e.g. if two shapefiles for different
+    treatments are both named “projectID.shp”, one will be removed and
+    the QM scripts will only run the other.
 - Refer to the [Data and software downloads
   table](#downloading-data-and-software) above to identify the data and
   software required.
