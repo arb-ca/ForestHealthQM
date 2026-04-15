@@ -26,7 +26,7 @@ First, download the below items according to your project type.
 
 | Data or Software | Restoration | Pest Management | Fuel Reduction | Conservation | Biomass Utilization |
 |----|:--:|:--:|:--:|:--:|:--:|
-| [Forest Restoration & Management Calculator Tool](https://www.caclimateinvestments.ca.gov/tools) | X | X | X | X | X |
+| [Forest Restoration & Management Calculator Tool](https://gcc02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fww2.arb.ca.gov%2Fsites%2Fdefault%2Ffiles%2Fauction-proceeds%2FFRM_Calculator_Tool25-26%2520Final%2520Revised%2520Apr14.xlsx&data=05%7C02%7CCarmen.Tubbesing%40arb.ca.gov%7Cf79c4c053fa942e8780408de9b04b26a%7C9de5aaee778840b1a438c0ccc98c87cc%7C0%7C0%7C639118641672841471%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=HevUDQn9fXEbmzVA1pppavKzCw412bu1ywbUiaIMfnQ%3D&reserved=0) | X | X | X | X | X |
 | [Code repository from GitHub](https://github.com/arb-ca/ForestHealthQM) | X | X | X |  |  |
 | [FVS software](https://www.fs.usda.gov/fvs/software/complete.php) | X | X | X | X |  |
 | [TreeMap files](https://research.fs.usda.gov/firelab/products/dataandtools/treemap-tree-level-model-united-states-forests) | X | X | X | X |  |
@@ -45,7 +45,7 @@ Use these selections in FVS when instructed in the procedures below.
 | Location in FVS GUI | Parameter or Keyword | Value |
 |----|----|----|
 | Simulate<br> ⤷ Time | Common starting year | Year in which treatment, planting, or easement will take place |
-| Simulate<br> ⤷ Time | Common ending year | End of Project (as shown in Calculator Tool) *+ 1* |
+| Simulate<br> ⤷ Time | Common ending year | End of Project (as shown in Calculator Tool) **+ 1** |
 | Simulate<br> ⤷ Time | Growth and reporting interval (years) | 5 |
 | Simulate<br> ⤷ Components<br> ⤷ Keywords<br> ⤷ Fire and Fuels Extension<br> ⤷ CarbCalc | Biomass predictions | 1 = Use Jenkins and others |
 |  | Units | 2 = Combined |
