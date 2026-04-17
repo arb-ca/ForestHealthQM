@@ -33,7 +33,9 @@ required_packages <- c(
   "gridExtra",
   "RColorBrewer",
   "zip",
-  "openxlsx"
+  "openxlsx",
+  "stringr",
+  "tidyverse"
 )
 
 # Install missing packages
