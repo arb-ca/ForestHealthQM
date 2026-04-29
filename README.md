@@ -178,8 +178,10 @@ Use these selections in FVS when instructed in the procedures below.
       - For mastication: leave
         `Proportion of surface fuel composed of masticated material` =
         .7
-  - Under `Event Monitor` → `Compute Stand Variables`, paste:  
-    `LiveCRem = TreeBio(0,0,1,All,0.,200.,0.,500.)*0.5*0.907185`
+  - Under `Event Monitor` → `Compute Stand Variables`,
+    - Year or cycle number = year of treatment
+    - In the Editor box, paste:  
+      `LiveCRem = TreeBio(0,0,1,All,0.,200.,0.,500.)*0.5*0.907185`
   - Rename MgmtID to **TRWF** and Run
 - Configure TRNF (Treatment No Fire)
   - Duplicate the TRWF run and rename as **TRNF**
