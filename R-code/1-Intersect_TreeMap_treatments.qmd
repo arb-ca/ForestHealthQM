@@ -35,7 +35,8 @@ required_packages <- c(
   "zip",
   "openxlsx",
   "stringr",
-  "tidyverse"
+  "tidyverse",
+  "purrr"
 )
 
 # Install missing packages
@@ -143,6 +144,7 @@ shapefiles <- list.files(
 shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
 
 bn <- basename(shapefiles)
+bn
 ```
 
 ### Remove duplicates
@@ -177,7 +179,7 @@ print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list),
 
 # Prepare shapefiles & TreeMap raster for spatial overlay
 
-### Make sure that each shapefile has TCN variable and rename if necessary
+### Make sure that each shapefile has TCN variable and rename the column if necessary
 ```{r}
 # Define possible names for the TCN column
 tcn_variants <- c("Tcn", "TreatmentC", "tcn", "treatmentc", "TNumber")
@@ -234,6 +236,62 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
+
+# NEW STEP: If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
+```{r}
+shp_list_new <- list()
+for(i in 1:length(shp_list)){
+  shp <- shp_list[[i]]
+  if(nrow(shp)>1){
+    shp_list <- shp_list[-i]
+    shp_list <- c(shp_list, split(shp, seq_len(nrow(shp))))
+  } else{
+    shp_list_new <- c(shp_list, shp)
+  }
+}
+shp_list <- shp_list_new
+```
+
+
+
+# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
+```{r, warning = FALSE}
+for(i in 1:length(shp_list)){
+  shp_i <- shp_list[[i]]
+  names <- names(shp_i)
+  if(!"TCN" %in% names){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN)
+  }else{
+    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
+  }
+  if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN %>% unique)
+  }
+}
+```
+
+
+# NEW STEP: Combine shapefiles according to `combine` var
+```{r}
+if(length(combine)>0){
+  idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns))
+  not_idx <- map_lgl(shp_list, ~ !any(.x$TCN %in% combine_tcns))
+  not_idx
+  combined_shp <- st_sf(geometry = st_union(do.call(rbind, shp_list[idx]))) %>% 
+    mutate(TCN=combine_tcns[1])
+  
+  shp_list <- shp_list[not_idx]
+  shp_list[[length(shp_list)+1]] <- combined_shp
+  
+}
+shp_list
+```
+
+
 # Overlap treatments and FVS variants
 
 ### Prep `fvs_varloc`
@@ -279,27 +337,9 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
-# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
-```{r, warning = FALSE}
-for(i in 1:length(shp_list)){
-  shp_i <- shp_list[[i]]
-  names <- names(shp_i)
-  if(!"TCN" %in% names){
-    print("CREATING TCNs!")
-    shp_list[[i]]$TCN <- paste0(i, "new")
-    print(shp_list[[i]]$TCN)
-  }else{
-    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
-  }
-  if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
-    print("CREATING TCNs!")
-    shp_list[[i]]$TCN <- paste0(i, "new")
-    print(shp_list[[i]]$TCN %>% unique)
-  }
-}
-```
 
-# List treatment types
+# List treatment types 
+This might not show treatment types if it's not listed in the source shapefile
 ```{r}
 for(i in 1:length(shp_list)){
   print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
@@ -321,7 +361,7 @@ shp_list <- lapply(shp_list, function(df) {
 ```
 
 
-# Combine all shapefiles for mapping
+# Combine all sf objects for mapping
 ```{r}
 combined_shp <- shp_list |> bind_rows()
 
@@ -356,7 +396,7 @@ for (i in 1:length(shp_list)) {
   shp_sf <- shp_list[[i]]
   shp_sf$trt_area <- st_area(shp_sf)
   shp <- vect(shp_sf)
-  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+  base_name <- shp$TCN
 
   if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
     print(paste("Skipping TCN =", shp_sf$TCN))
@@ -376,6 +416,7 @@ for (i in 1:length(shp_list)) {
   shp_buff_sf$trt_area <- as.numeric(shp_buff_sf$trt_area)
   buffers[[base_name]] <- shp_buff_sf
 }
+buffers
 ```
 
 ### Combine them and filter for fuels reduction
@@ -442,13 +483,13 @@ ignore_ia <- function(){
 ```{r, warning = F}
 keeps <- c()
 ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
 # ignore_ia()
 ```
 
@@ -559,7 +600,7 @@ for (i in 1:length(shp_list)) {
   print(i)
   shp_sf <- shp_list[[i]]
   shp <- vect(shp_sf)
-  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+  base_name <- shp$TCN
 
   if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
     print(paste("Skipping TCN =", shp_sf$TCN))
@@ -695,6 +736,12 @@ if(length(tcn_df)>0){
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
   arrange(TCN)
+
+
+areas_table <- areas_table %>% 
+  mutate(index = seq(1:nrow(areas_table))) %>% 
+  mutate(Shapefile =  tools::file_path_sans_ext(basename(shapefiles[index])))
+
 # Print a pretty table
 flextable(areas_table)
 ```
