@@ -255,16 +255,14 @@ for(i in 1:length(shp_list)){
   shp <- shp_list[[i]]
   if(nrow(shp)>1){
     shp_new <- split(shp, seq_len(nrow(shp)))
+    print(paste("SPLITTING TCN =", shp$TCN))
     shp_list_new <- c(shp_list_new, shp_new)
   } else{
     shp_list_new[[length(shp_list_new)+1]] <- shp
   }
 }
 shp_list <- shp_list_new
-shp_list
 ```
-
-
 
 # Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
 ```{r, warning = FALSE}
@@ -285,7 +283,6 @@ for(i in 1:length(shp_list)){
   }
 }
 ```
-
 
 # NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
 ```{r}
