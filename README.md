@@ -82,7 +82,7 @@ Use these selections in FVS when instructed in the procedures below.
   table](#downloading-data-and-software) above to identify the data and
   software required.
   - Download and install or unzip each item.
-- Prepare raster data
+- Prepare raster data, if needed
   - Using the tool of your choice (e.g., ArcGIS Pro), perform raster
     math to average the 2011 and 2047 FSim rasters
   - For faster processing times, you may also want to clip the TreeMap
@@ -97,14 +97,16 @@ Use these selections in FVS when instructed in the procedures below.
 
 ### 3. Configure `project_vars.R`
 
-- Open `project_vars.R`  
-- Replace the file paths and directory locations
-- Set the TreeMap vintage in Script 1 based on the year of your
-  treatments
-- Define the project name, treatment name, and shapefile name<br>
+- Open `project_vars.R`
+- Set the project name and project ID
+- Set the TreeMap vintage (“tm”) based on the year of your treatments
+- Define the project name, treatment name, and folder where treatment
+  shapefiles are located (“trt_dr”)<br>
 
 ### 4. Run Scripts 1 and 2
 
+- These end in “.qmd”
+- To run each script in Rstudio, hit “Render” at the top
 - You only need to run each of these scripts once per project, even if
   there are multiple treatment types.
 - They read in all shapefiles in a specified folder, prepare them for
@@ -122,14 +124,14 @@ Use these selections in FVS when instructed in the procedures below.
 ### 5. Run FVS simulations for the Treatment Area
 
 - Open the FVS software and start a new project
-- Under `Import input data`, upload the treatment area FVS input file
-  into FVS
+- Under `Manage Project` –\> `Import input data`, upload the treatment
+  area FVS input file into FVS
   - These files will be located in the folder `FVS_Input` and will
     follow the naming convention “FVS_input\_” + project_ID + TCN
     - Example: `FVS_input_8GG24601_3.3.xlsx`
   - Then select `Install uploaded database`
 - Under `Simulate`, select `All_Stands` and click
-  `Add stands in selected groups.`  
+  `Add stands in selected groups.`
   - This adds all stands in the input data to your simulation.
 - Configure for all runs
   - Set `Time`, `CarbCalc`, and `FireCalc` variables according to the
@@ -150,6 +152,7 @@ Use these selections in FVS when instructed in the procedures below.
   - Choose the number of cores you want to use. Consider using a third
     to a quarter of the cores on your computer so that you can run
     multiple FVS simulations in the background at the same time.
+  - Hit `Save and Run`
 - Configure and run BSWF (Baseline With Fire)
   - Duplicate the BSNF run and rename it **BSWF**, then save
   - Add the **SimFire** keyword under the Fire and Fuels Extension
@@ -178,7 +181,7 @@ Use these selections in FVS when instructed in the procedures below.
       - For mastication: leave
         `Proportion of surface fuel composed of masticated material` =
         .7
-  - Under `Event Monitor` → `Compute Stand Variables`,
+  - Under `Event Monitor` → `Compute Stand Variables in Editor`,
     - Year or cycle number = year of treatment
     - In the Editor box, paste:  
       `LiveCRem = TreeBio(0,0,1,All,0.,200.,0.,500.)*0.5*0.907185`
