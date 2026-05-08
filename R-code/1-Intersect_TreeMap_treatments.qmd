@@ -35,7 +35,8 @@ required_packages <- c(
   "zip",
   "openxlsx",
   "stringr",
-  "tidyverse"
+  "tidyverse",
+  "purrr"
 )
 
 # Install missing packages
@@ -143,6 +144,7 @@ shapefiles <- list.files(
 shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
 
 bn <- basename(shapefiles)
+bn
 ```
 
 ### Remove duplicates
@@ -177,7 +179,7 @@ print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list),
 
 # Prepare shapefiles & TreeMap raster for spatial overlay
 
-### Make sure that each shapefile has TCN variable and rename if necessary
+### Make sure that each shapefile has TCN variable and rename the column if necessary
 ```{r}
 # Define possible names for the TCN column
 tcn_variants <- c("Tcn", "TreatmentC", "tcn", "treatmentc", "TNumber")
@@ -234,6 +236,88 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
+# Add shapefile as column in shp
+```{r}
+for(i in 1:length(shp_list)){
+    
+    shp_list[[i]]$shapefile <- tools::file_path_sans_ext(basename(shapefiles[i]))
+}
+shp_list
+
+```
+
+
+# NEW STEP: If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
+```{r}
+shp_list_new <- list()
+for(i in 1:length(shp_list)){
+
+  shp <- shp_list[[i]]
+  if(nrow(shp)>1){
+    shp_new <- split(shp, seq_len(nrow(shp)))
+    print(paste("SPLITTING TCN =", shp$TCN))
+    shp_list_new <- c(shp_list_new, shp_new)
+  } else{
+    shp_list_new[[length(shp_list_new)+1]] <- shp
+  }
+}
+shp_list <- shp_list_new
+```
+
+# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
+```{r, warning = FALSE}
+for(i in 1:length(shp_list)){
+  shp_i <- shp_list[[i]]
+  names <- names(shp_i)
+  if(!"TCN" %in% names){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN)
+  }else{
+    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
+  }
+  if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
+    print("CREATING TCNs!")
+    shp_list[[i]]$TCN <- paste0(i, "new")
+    print(shp_list[[i]]$TCN %>% unique)
+  }
+}
+```
+
+# NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
+```{r}
+if(length(combine_tcns)>0){
+  idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns))
+  not_idx <- map_lgl(shp_list, ~ !any(.x$TCN %in% combine_tcns))
+  not_idx
+  shapefiles <- unique(unlist(lapply(shp_list[idx], function(x) x$shapefile))) %>% 
+    paste(collapse = ";")
+  combined_shp <- st_sf(geometry = st_union(do.call(rbind, shp_list[idx]))) %>% 
+    mutate(TCN=combine_tcns[1]) %>% 
+    mutate(shapefiles = shapefiles)
+  
+  shp_list <- shp_list[not_idx]
+  shp_list[[length(shp_list)+1]] <- combined_shp
+}
+```
+
+```{r}
+if(length(combine_tcns_2)>0){
+  idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns_2))
+  not_idx <- map_lgl(shp_list, ~ !any(.x$TCN %in% combine_tcns_2))
+  not_idx
+  shapefiles <- unique(unlist(lapply(shp_list[idx], function(x) x$shapefile))) %>% 
+    paste(collapse = ";")
+  combined_shp <- st_sf(geometry = st_union(do.call(rbind, shp_list[idx]))) %>% 
+    mutate(TCN=combine_tcns_2[1]) %>% 
+    mutate(shapefiles = shapefiles)
+  
+  shp_list <- shp_list[not_idx]
+  shp_list[[length(shp_list)+1]] <- combined_shp
+}
+```
+
+
 # Overlap treatments and FVS variants
 
 ### Prep `fvs_varloc`
@@ -279,27 +363,9 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
-# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
-```{r, warning = FALSE}
-for(i in 1:length(shp_list)){
-  shp_i <- shp_list[[i]]
-  names <- names(shp_i)
-  if(!"TCN" %in% names){
-    print("CREATING TCNs!")
-    shp_list[[i]]$TCN <- paste0(i, "new")
-    print(shp_list[[i]]$TCN)
-  }else{
-    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
-  }
-  if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
-    print("CREATING TCNs!")
-    shp_list[[i]]$TCN <- paste0(i, "new")
-    print(shp_list[[i]]$TCN %>% unique)
-  }
-}
-```
 
-# List treatment types
+# List treatment types 
+This might not show treatment types if it's not listed in the source shapefile
 ```{r}
 for(i in 1:length(shp_list)){
   print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
@@ -321,7 +387,7 @@ shp_list <- lapply(shp_list, function(df) {
 ```
 
 
-# Combine all shapefiles for mapping
+# Combine all sf objects for mapping
 ```{r}
 combined_shp <- shp_list |> bind_rows()
 
@@ -339,24 +405,130 @@ combined_shp <- combined_shp %>%
 
 
 ```{r}
-ggplot(combined_shp)+
+plot_all <- ggplot(combined_shp)+
   geom_sf(aes(fill = TCN), alpha = .3) 
+plot_all
 ```
 
+
+
+# Loop the areas calculations across all shapefiles in a path
+
+For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
+
+```{r}
+map_list <- list()
+treemap_areas_list <- list()
+shp_areas_list <- list()
+shapefile_list <- list()
+for (i in 1:length(shp_list)) {
+  print(i)
+  shp_sf <- shp_list[[i]]
+  shp <- vect(shp_sf)
+  base_name <- shp$TCN
+
+  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
+    print(paste("Skipping TCN =", shp_sf$TCN))
+    next
+  }
+
+  tm_poly <- crop(tmrast, shp, mask = T) %>% 
+    as.polygons %>% 
+    makeValid()
+  # Intersect
+  intersected <- terra::intersect(tm_poly, shp)
+  if(nrow(intersected)==0){
+    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
+    next()
+  }
+  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
+
+  # convert intersected to sf 
+  intersected_sf<- sf::st_as_sf(intersected)
+  
+  # Remove columns
+  intersected_sf <- intersected_sf %>% 
+    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+  
+  # Write to shapefile
+  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
+   
+  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  
+  # Zip the shapefiles for easier import into TRIAADS
+  zip_files <- list.files(full.names = TRUE, recursive = T)
+  zip_files <- zip_files[grepl(shapefile_name, basename(zip_files), ignore.case = TRUE)]
+  zip_files <- gsub("^\\./", "", zip_files)
+ 
+  zip_name <- paste0(triaads_output_dir,"/", shapefile_name, ".zip")
+  zip(zipfile = zip_name, files = zip_files)
+  file.remove(zip_files)
+  
+  # Calculate areas
+  intersected <- intersected_sf %>% 
+    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
+    st_drop_geometry() %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    summarize(area_m = sum(area_m)) %>% 
+    mutate(area_ac = area_m/4046.8726098743)
+    
+  # Write results to table and to shapefile
+  file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
+  write_xlsx(intersected, file_name)
+  
+    # Plot using ggplot2
+  map_name <- unique(shp_sf$TCN)
+  map <- ggplot() +
+    geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
+    labs(fill = "TreeMapper ID (TM_ID)")+
+    theme(legend.position = "none")+
+    geom_sf(data = shp_sf, fill = NA)
+  
+  map_list[[map_name]] <- map
+  
+  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
+  shp_areas_list[[base_name]] <- st_area(shp_sf)
+
+  shapefile_list[[base_name]] <- shp_sf$shapefile
+
+}
+```
+
+# Exit the script if no polygons overlap with Treemap
+
+```{r early-exit, include=FALSE}
+obj <- get0("treemap_areas_list", inherits = TRUE)
+
+if (is.null(obj)) {
+  knitr::knit_exit()
+}
+
+if (length(obj) == 0) {
+  knitr::knit_exit()
+}
+```
 
 
 # Impact Area calculations
 
 *For projects that do not include Fuels Reduction or Pest Management, this section can be removed.*
 
+## Exclude shapefiles from impact analysis if acreage <5 ac
+```{r}
+not_tiny <- treemap_areas_list >=5
+shp_list_impact <- shp_list[not_tiny]
+```
+
+
 ### Create buffer polygons around each treatment and mask out the treatment area
 ```{r}
 buffers <- list()
-for (i in 1:length(shp_list)) {
-  shp_sf <- shp_list[[i]]
+for (i in 1:length(shp_list_impact)) {
+  shp_sf <- shp_list_impact[[i]]
   shp_sf$trt_area <- st_area(shp_sf)
   shp <- vect(shp_sf)
-  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
+  base_name <- shp$TCN
 
   if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
     print(paste("Skipping TCN =", shp_sf$TCN))
@@ -442,13 +614,13 @@ ignore_ia <- function(){
 ```{r, warning = F}
 keeps <- c()
 ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
 # ignore_ia()
 ```
 
@@ -545,106 +717,6 @@ ggplot(shp_buff_sf)+
   geom_sf(data = intersected_sf_buff)
 ```
 
-
-# Loop the areas calculations across all shapefiles in a path
-
-For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
-
-```{r}
-map_list <- list()
-treemap_areas_list <- list()
-shp_areas_list <- list()
-TCN_list <- list()
-for (i in 1:length(shp_list)) {
-  print(i)
-  shp_sf <- shp_list[[i]]
-  shp <- vect(shp_sf)
-  base_name <- tools::file_path_sans_ext(basename(shapefiles[i]))
-
-  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
-    print(paste("Skipping TCN =", shp_sf$TCN))
-    next
-  }
-
-  tm_poly <- crop(tmrast, shp, mask = T) %>% 
-    as.polygons %>% 
-    makeValid()
-  # Intersect
-  intersected <- terra::intersect(tm_poly, shp)
-  if(nrow(intersected)==0){
-    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
-    next()
-  }
-  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
-
-  # convert intersected to sf 
-  intersected_sf<- sf::st_as_sf(intersected)
-  
-  # Remove columns
-  intersected_sf <- intersected_sf %>% 
-    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
-  
-  # Write to shapefile
-  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
-   
-  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-  
-  
-  # Zip the shapefiles for easier import into TRIAADS
-  zip_files <- list.files(full.names = TRUE, recursive = T)
-  zip_files <- zip_files[grepl(shapefile_name, basename(zip_files), ignore.case = TRUE)]
-  zip_files <- gsub("^\\./", "", zip_files)
- 
-  zip_name <- paste0(triaads_output_dir,"/", shapefile_name, ".zip")
-  zip(zipfile = zip_name, files = zip_files)
-  file.remove(zip_files)
-  
-  # Calculate areas
-  intersected <- intersected_sf %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
-    st_drop_geometry() %>% 
-    group_by(TM_ID, FVSVariant) %>% 
-    summarize(area_m = sum(area_m)) %>% 
-    mutate(area_ac = area_m/4046.8726098743)
-    
-  # Write results to table and to shapefile
-  file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
-  write_xlsx(intersected, file_name)
-  
-    # Plot using ggplot2
-  map_name <- unique(shp_sf$TCN)
-  map <- ggplot() +
-    geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
-    labs(fill = "TreeMapper ID (TM_ID)")+
-    theme(legend.position = "none")+
-    geom_sf(data = shp_sf, fill = NA)
-  
-  map_list[[map_name]] <- map
-  
-  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
-  shp_areas_list[[base_name]] <- st_area(shp_sf)
-
-  TCN_list[[base_name]] <- shp_sf$TCN
-
-}
-```
-
-# Exit the script if no polygons overlap with Treemap
-
-```{r early-exit, include=FALSE}
-obj <- get0("treemap_areas_list", inherits = TRUE)
-
-if (is.null(obj)) {
-  knitr::knit_exit()
-}
-
-if (length(obj) == 0) {
-  knitr::knit_exit()
-}
-```
-
-
-
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
@@ -656,9 +728,8 @@ treemap_areas_df<- tibble(
 ) 
 
 treemap_areas_df <- treemap_areas_df %>% 
-  mutate(Value = round(Value)) %>% 
   rename("TreeMap Acres" = Value) %>% 
-  rename(Shapefile = Name)
+  rename(TCN = Name)
 ```
 
 ## Sum areas for treatments with multipart polygons
@@ -673,11 +744,11 @@ shp_areas_df <- tibble(
 
 ## Do the same for TCN
 ```{r, warning = F}
-TCN_list <- sapply(TCN_list, unique)
+shapefile_list <- sapply(shapefile_list, unique)
 
-tcn_df <- tibble(
-  Shapefile = names(TCN_list),
-  TCN = unlist(TCN_list)
+shapefile_df <- tibble(
+  TCN = names(shapefile_list),
+  shapefile = unlist(shapefile_list)
 )
 ```
 
@@ -686,19 +757,31 @@ shp_areas_df <- shp_areas_df %>%
   mutate(Value = Value/4046.86) %>% 
   mutate(Value = round(Value)) %>% 
   rename("Shapefile Acres" = Value) %>% 
-  rename(Shapefile = Name)
+  rename(TCN = Name)
 
-if(length(tcn_df)>0){
- shp_areas_df <- full_join(tcn_df, shp_areas_df) 
+if(length(shapefile_df)>0){
+ shp_areas_df <- full_join(shapefile_df, shp_areas_df) 
 }
-
+shp_areas_df
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
   arrange(TCN)
-# Print a pretty table
-flextable(areas_table)
 ```
 
+## Add column for if it's too small for QM
+```{r}
+areas_table <- areas_table %>% 
+  mutate(`QM calculations?` = ifelse(`TreeMap Acres`<.5, 
+        "No", "Yes")) %>% 
+  mutate(`TreeMap Acres`=round(`TreeMap Acres`))
+```
+
+
+## Add a column for whether it needs impact area calculations
+```{r}
+areas_table <- areas_table %>% 
+  mutate(`Impact area calculations?` = ifelse(TCN %in% buff_combined$TCN, "Yes", "No"))
+```
 
 # Maps & Overlaps
 
@@ -713,7 +796,7 @@ plot_data <- bind_rows(combined_shp, overlaps)
 ```
 
 ```{r, out.width="100%", fig.height=12}
-if(length(tcn_df)>0){
+if(length(shapefile_df)>0){
   ggplot() +
     geom_sf(data = combined_shp, aes(fill = as.factor(TCN), col = as.factor(TCN)), alpha = 0.5) + 
     geom_sf(data = overlaps, fill = "black", color = "black", alpha = 0.5) +
@@ -782,7 +865,7 @@ overlaps <- st_intersection(combined_shp) %>%
 ### Plot each treatment group (e.g. 1.1 and 1.2) together, with overlaps
 
 ```{r}
-if(length(tcn_df)>0){
+if(length(shapefile_df)>0){
   combined_shp$treatment_group <- sub("\\..*", "", combined_shp$TCN)
   overlaps$treatment_group <- sub("\\..*", "", overlaps$TCN)
 }
@@ -842,9 +925,8 @@ ggplot() +
 
 # Important info for FVS runs:
 ```{r}
+plot_all
 flextable(areas_table)
 ```
 
 ## FVS Variant  selection is/are `r unique(combined_shp$FVSVariant)`
-
-## The TCNs that will have impact area calculations are `r buff_combined$TCN`
