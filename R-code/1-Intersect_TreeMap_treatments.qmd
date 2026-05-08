@@ -257,7 +257,7 @@ for(i in 1:length(shp_list)){
     shp_new <- split(shp, seq_len(nrow(shp)))
     shp_list_new <- c(shp_list_new, shp_new)
   } else{
-    shp_list_new <- c(shp_list_new, shp)
+    shp_list_new[[length(shp_list_new)+1]] <- shp
   }
 }
 shp_list <- shp_list_new
@@ -446,7 +446,6 @@ for (i in 1:length(shp_list)) {
   shp_buff_sf$trt_area <- as.numeric(shp_buff_sf$trt_area)
   buffers[[base_name]] <- shp_buff_sf
 }
-buffers
 ```
 
 ### Combine them and filter for fuels reduction
