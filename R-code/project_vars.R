@@ -1,5 +1,6 @@
-proj_name <- "Upper Pit River Forest Health Project"
-project_ID <- "8GG18654"
+
+proj_name <- "Middletown And Cobb Community Evacuation Routes - Phase 2"
+project_ID <- "25-WP-LNU-79252605"
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 noFVS <- c()
@@ -22,7 +23,8 @@ rf_shp_name <- "71625010_1_1_20250114.shp"
 
 ## Define directory with treatment shapefiles in it
 ## This can be located anywhere on your computer. It doesn't need to be in the same folder as this code
-trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/QM Runs 2026/8GG18654/Shapefiles"
+trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/QM Runs 2026/WPGP/Shapefiles/25_WP_LNU_79252605"
+
 
 ### Define "data" directory 
 data_dir <- "../../data"
