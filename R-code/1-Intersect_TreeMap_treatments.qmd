@@ -412,15 +412,120 @@ plot_all
 
 
 
+# Loop the areas calculations across all shapefiles in a path
+
+For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
+
+```{r}
+map_list <- list()
+treemap_areas_list <- list()
+shp_areas_list <- list()
+shapefile_list <- list()
+for (i in 1:length(shp_list)) {
+  print(i)
+  shp_sf <- shp_list[[i]]
+  shp <- vect(shp_sf)
+  base_name <- shp$TCN
+
+  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
+    print(paste("Skipping TCN =", shp_sf$TCN))
+    next
+  }
+
+  tm_poly <- crop(tmrast, shp, mask = T) %>% 
+    as.polygons %>% 
+    makeValid()
+  # Intersect
+  intersected <- terra::intersect(tm_poly, shp)
+  if(nrow(intersected)==0){
+    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
+    next()
+  }
+  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
+
+  # convert intersected to sf 
+  intersected_sf<- sf::st_as_sf(intersected)
+  
+  # Remove columns
+  intersected_sf <- intersected_sf %>% 
+    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+  
+  # Write to shapefile
+  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
+   
+  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  
+  
+  # Zip the shapefiles for easier import into TRIAADS
+  zip_files <- list.files(full.names = TRUE, recursive = T)
+  zip_files <- zip_files[grepl(shapefile_name, basename(zip_files), ignore.case = TRUE)]
+  zip_files <- gsub("^\\./", "", zip_files)
+ 
+  zip_name <- paste0(triaads_output_dir,"/", shapefile_name, ".zip")
+  zip(zipfile = zip_name, files = zip_files)
+  file.remove(zip_files)
+  
+  # Calculate areas
+  intersected <- intersected_sf %>% 
+    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
+    st_drop_geometry() %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    summarize(area_m = sum(area_m)) %>% 
+    mutate(area_ac = area_m/4046.8726098743)
+    
+  # Write results to table and to shapefile
+  file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
+  write_xlsx(intersected, file_name)
+  
+    # Plot using ggplot2
+  map_name <- unique(shp_sf$TCN)
+  map <- ggplot() +
+    geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
+    labs(fill = "TreeMapper ID (TM_ID)")+
+    theme(legend.position = "none")+
+    geom_sf(data = shp_sf, fill = NA)
+  
+  map_list[[map_name]] <- map
+  
+  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
+  shp_areas_list[[base_name]] <- st_area(shp_sf)
+
+  shapefile_list[[base_name]] <- shp_sf$shapefile
+
+}
+```
+
+# Exit the script if no polygons overlap with Treemap
+
+```{r early-exit, include=FALSE}
+obj <- get0("treemap_areas_list", inherits = TRUE)
+
+if (is.null(obj)) {
+  knitr::knit_exit()
+}
+
+if (length(obj) == 0) {
+  knitr::knit_exit()
+}
+```
+
+
 # Impact Area calculations
 
 *For projects that do not include Fuels Reduction or Pest Management, this section can be removed.*
 
+## Exclude shapefiles from impact analysis if acreage <5 ac
+```{r}
+not_tiny <- treemap_areas_list >=5
+shp_list_impact <- shp_list[not_tiny]
+```
+
+
 ### Create buffer polygons around each treatment and mask out the treatment area
 ```{r}
 buffers <- list()
-for (i in 1:length(shp_list)) {
-  shp_sf <- shp_list[[i]]
+for (i in 1:length(shp_list_impact)) {
+  shp_sf <- shp_list_impact[[i]]
   shp_sf$trt_area <- st_area(shp_sf)
   shp <- vect(shp_sf)
   base_name <- shp$TCN
@@ -612,106 +717,6 @@ ggplot(shp_buff_sf)+
   geom_sf(data = intersected_sf_buff)
 ```
 
-
-# Loop the areas calculations across all shapefiles in a path
-
-For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
-
-```{r}
-map_list <- list()
-treemap_areas_list <- list()
-shp_areas_list <- list()
-shapefile_list <- list()
-for (i in 1:length(shp_list)) {
-  print(i)
-  shp_sf <- shp_list[[i]]
-  shp <- vect(shp_sf)
-  base_name <- shp$TCN
-
-  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
-    print(paste("Skipping TCN =", shp_sf$TCN))
-    next
-  }
-
-  tm_poly <- crop(tmrast, shp, mask = T) %>% 
-    as.polygons %>% 
-    makeValid()
-  # Intersect
-  intersected <- terra::intersect(tm_poly, shp)
-  if(nrow(intersected)==0){
-    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
-    next()
-  }
-  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
-
-  # convert intersected to sf 
-  intersected_sf<- sf::st_as_sf(intersected)
-  
-  # Remove columns
-  intersected_sf <- intersected_sf %>% 
-    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
-  
-  # Write to shapefile
-  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
-   
-  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-  
-  
-  # Zip the shapefiles for easier import into TRIAADS
-  zip_files <- list.files(full.names = TRUE, recursive = T)
-  zip_files <- zip_files[grepl(shapefile_name, basename(zip_files), ignore.case = TRUE)]
-  zip_files <- gsub("^\\./", "", zip_files)
- 
-  zip_name <- paste0(triaads_output_dir,"/", shapefile_name, ".zip")
-  zip(zipfile = zip_name, files = zip_files)
-  file.remove(zip_files)
-  
-  # Calculate areas
-  intersected <- intersected_sf %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
-    st_drop_geometry() %>% 
-    group_by(TM_ID, FVSVariant) %>% 
-    summarize(area_m = sum(area_m)) %>% 
-    mutate(area_ac = area_m/4046.8726098743)
-    
-  # Write results to table and to shapefile
-  file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
-  write_xlsx(intersected, file_name)
-  
-    # Plot using ggplot2
-  map_name <- unique(shp_sf$TCN)
-  map <- ggplot() +
-    geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
-    labs(fill = "TreeMapper ID (TM_ID)")+
-    theme(legend.position = "none")+
-    geom_sf(data = shp_sf, fill = NA)
-  
-  map_list[[map_name]] <- map
-  
-  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
-  shp_areas_list[[base_name]] <- st_area(shp_sf)
-
-  shapefile_list[[base_name]] <- shp_sf$shapefile
-
-}
-```
-
-# Exit the script if no polygons overlap with Treemap
-
-```{r early-exit, include=FALSE}
-obj <- get0("treemap_areas_list", inherits = TRUE)
-
-if (is.null(obj)) {
-  knitr::knit_exit()
-}
-
-if (length(obj) == 0) {
-  knitr::knit_exit()
-}
-```
-
-
-
 # Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
@@ -723,7 +728,6 @@ treemap_areas_df<- tibble(
 ) 
 
 treemap_areas_df <- treemap_areas_df %>% 
-  mutate(Value = round(Value)) %>% 
   rename("TreeMap Acres" = Value) %>% 
   rename(TCN = Name)
 ```
@@ -754,6 +758,7 @@ shp_areas_df <- shp_areas_df %>%
   mutate(Value = round(Value)) %>% 
   rename("Shapefile Acres" = Value) %>% 
   rename(TCN = Name)
+
 if(length(shapefile_df)>0){
  shp_areas_df <- full_join(shapefile_df, shp_areas_df) 
 }
@@ -761,11 +766,22 @@ shp_areas_df
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
   arrange(TCN)
-
-# Print a pretty table
-flextable(areas_table)
 ```
 
+## Add column for if it's too small for QM
+```{r}
+areas_table <- areas_table %>% 
+  mutate(`QM calculations?` = ifelse(`TreeMap Acres`<.5, 
+        "No", "Yes")) %>% 
+  mutate(`TreeMap Acres`=round(`TreeMap Acres`))
+```
+
+
+## Add a column for whether it needs impact area calculations
+```{r}
+areas_table <- areas_table %>% 
+  mutate(`Impact area calculations?` = ifelse(TCN %in% buff_combined$TCN, "Yes", "No"))
+```
 
 # Maps & Overlaps
 
@@ -914,5 +930,3 @@ flextable(areas_table)
 ```
 
 ## FVS Variant  selection is/are `r unique(combined_shp$FVSVariant)`
-
-## The TCNs that will have impact area calculations are `r buff_combined$TCN`
