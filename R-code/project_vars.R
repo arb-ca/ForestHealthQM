@@ -4,11 +4,10 @@ project_ID <- "25-WP-LNU-79252605"
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 noFVS <- c()
-combine_tcns <- c("5new", "6new", "7new", "8new")
 
 ## Define which treatments get combined for FVS modeling
 ## If you only have one treatment polygon, leave this as-is
-combine_tcns <- c() #example: c("1new","2new","5new")
+combine_tcns <- c("5new", "6new", "7new", "8new") #example: c("1new","2new","5new")
 combine_tcns_2 <- c()
 
 ### Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.

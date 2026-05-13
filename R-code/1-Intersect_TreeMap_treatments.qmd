@@ -91,7 +91,7 @@ fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 
 ### Clear temp directory (`temp`)
 ```{r}
-#unlink(paste0(temp_dir, "/*"), recursive = TRUE)
+unlink(paste0(temp_dir, "/*"), recursive = TRUE)
 ```
 
 ### Read in TreeMap dataset(s)
@@ -151,8 +151,6 @@ bn
 ```{r}
 shapefiles <- shapefiles[!duplicated(bn)]
 ```
-
-
 
 ### Remove shapefiles with "boundary" in the name because these are often project boundaries rather than individual treatment polygons
 
@@ -236,14 +234,12 @@ rename_Tobj_column <- function(sf_obj) {
 shp_list <- lapply(shp_list, rename_Tobj_column)
 ```
 
-# Add shapefile as column in shp
+## Add shapefile name as column in shp
 ```{r}
 for(i in 1:length(shp_list)){
     
     shp_list[[i]]$shapefile <- tools::file_path_sans_ext(basename(shapefiles[i]))
 }
-shp_list
-
 ```
 
 
@@ -255,7 +251,7 @@ for(i in 1:length(shp_list)){
   shp <- shp_list[[i]]
   if(nrow(shp)>1){
     shp_new <- split(shp, seq_len(nrow(shp)))
-    print(paste("SPLITTING TCN =", shp$TCN))
+    print(paste("SPLITTING SHAPEFILE", shp$TCN))
     shp_list_new <- c(shp_list_new, shp_new)
   } else{
     shp_list_new[[length(shp_list_new)+1]] <- shp
@@ -364,7 +360,7 @@ shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
 
-# List treatment types 
+## List treatment types 
 This might not show treatment types if it's not listed in the source shapefile
 ```{r}
 for(i in 1:length(shp_list)){
@@ -372,7 +368,7 @@ for(i in 1:length(shp_list)){
 }
 ```
 
-# Convert GrantID and VegType to character in all elements of shp_list if they exist
+## Convert GrantID and VegType to character in all elements of shp_list if they exist
 ```{r}
 shp_list <- lapply(shp_list, function(df) {
   if ("GrantID" %in% names(df)) {
@@ -387,7 +383,7 @@ shp_list <- lapply(shp_list, function(df) {
 ```
 
 
-# Combine all sf objects for mapping
+## Combine all sf objects for mapping
 ```{r}
 combined_shp <- shp_list |> bind_rows()
 
@@ -410,19 +406,17 @@ plot_all <- ggplot(combined_shp)+
 plot_all
 ```
 
+# Areas calculations for treatment area
 
-
-# Loop the areas calculations across all shapefiles in a path
-
-For each shapefile in `trt_dir`, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
+For each TCN, calculate the area of each value of TM_ID that intersects with that polygon and save as an excel file
 
 ```{r}
 map_list <- list()
 treemap_areas_list <- list()
 shp_areas_list <- list()
 shapefile_list <- list()
+
 for (i in 1:length(shp_list)) {
-  print(i)
   shp_sf <- shp_list[[i]]
   shp <- vect(shp_sf)
   base_name <- shp$TCN
@@ -441,7 +435,6 @@ for (i in 1:length(shp_list)) {
     print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
     next()
   }
-  print(paste("Created TreeMap Polygons for trt area of TCN", unique(shp_sf$TCN)))
 
   # convert intersected to sf 
   intersected_sf<- sf::st_as_sf(intersected)
@@ -450,11 +443,28 @@ for (i in 1:length(shp_list)) {
   intersected_sf <- intersected_sf %>% 
     select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
   
-  # Write to shapefile
-  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
-   
-  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  # Calculate areas
+  intersected <- intersected_sf %>% 
+    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
+    st_drop_geometry() %>% 
+    group_by(TM_ID, FVSVariant) %>% 
+    summarize(area_m = sum(area_m), .groups = "keep") %>% 
+    mutate(area_ac = area_m/4046.8726098743)
   
+  # Save info
+  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
+  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
+  shp_areas_list[[base_name]] <- st_area(shp_sf)
+  shapefile_list[[base_name]] <- shp_sf$shapefile
+  
+  # Exit the loop if total treemap areas is less than 0.5 ac
+  if(sum(intersected$area_ac)<0.5){
+    print(paste0(shp$TCN, ": Skipping because area < 0.5 ac"))
+    next()
+  }
+  
+  # Write to shapefile
+  st_write(obj = intersected_sf, dsn = paste0(shapefile_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
   
   # Zip the shapefiles for easier import into TRIAADS
   zip_files <- list.files(full.names = TRUE, recursive = T)
@@ -465,17 +475,11 @@ for (i in 1:length(shp_list)) {
   zip(zipfile = zip_name, files = zip_files)
   file.remove(zip_files)
   
-  # Calculate areas
-  intersected <- intersected_sf %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf))) %>% 
-    st_drop_geometry() %>% 
-    group_by(TM_ID, FVSVariant) %>% 
-    summarize(area_m = sum(area_m)) %>% 
-    mutate(area_ac = area_m/4046.8726098743)
-    
   # Write results to table and to shapefile
   file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
+  
+    print(paste0(unique(shp_sf$TCN), ": Created areas files" ))
   
     # Plot using ggplot2
   map_name <- unique(shp_sf$TCN)
@@ -486,18 +490,12 @@ for (i in 1:length(shp_list)) {
     geom_sf(data = shp_sf, fill = NA)
   
   map_list[[map_name]] <- map
-  
-  treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
-  shp_areas_list[[base_name]] <- st_area(shp_sf)
-
-  shapefile_list[[base_name]] <- shp_sf$shapefile
-
 }
 ```
 
 # Exit the script if no polygons overlap with Treemap
 
-```{r early-exit, include=FALSE}
+```{r early-exit}
 obj <- get0("treemap_areas_list", inherits = TRUE)
 
 if (is.null(obj)) {
@@ -550,7 +548,7 @@ for (i in 1:length(shp_list_impact)) {
 }
 ```
 
-### Combine them and filter for fuels reduction
+### Combine them and filter for fuels reduction, if it's listed in the shapefile attributes
 ```{r}
 if("Tobj" %in% names(buffers[[1]])){
   buff_combined <- buffers |> bind_rows() %>% 
@@ -617,10 +615,10 @@ ignore_ia()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
-ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
+# ignore_ia()
 # ignore_ia()
 ```
 
@@ -636,7 +634,7 @@ impact_map_filtered <- ggplot(buff_combined)+
 grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
 ```
 
-#### Identify PM treatments that need impact area calculations
+#### Identify Pest Management treatments that need impact area calculations
 ```{r}
 if("Pest_Management" %in% names(combined_shp)){
   PM_TCNs <- combined_shp %>% 
@@ -685,14 +683,13 @@ for(i in 1:nrow(buffers_final)){
     mutate(area_m = as.numeric(st_area(intersected_sf_buff))) %>% 
     st_drop_geometry() %>% 
     group_by(TM_ID, FVSVariant) %>% 
-    summarize(area_m = sum(area_m)) %>% 
+    summarize(area_m = sum(area_m),  .groups = "keep") %>% 
     mutate(area_ac = area_m/4046.8726098743)
     
-
   # Write results to table and to shapefile (for TRIAADS)
   file_name <- paste(temp_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
   write_xlsx(intersected_buff, file_name)
-  print(paste("Created TreeMap Polygons for impact area of TCN", shp_buff_sf$TCN))
+  print(paste0(shp_buff_sf$TCN, ": Created TreeMap Polygons for impact area"))
   
   shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
   shp_name <- gsub("\\.", "_", shp_name)
@@ -717,7 +714,9 @@ ggplot(shp_buff_sf)+
   geom_sf(data = intersected_sf_buff)
 ```
 
-# Find TreeMap acres for each polygon as a percentage of total shapefile area
+# Make a table with essential info for each TCN
+
+## Find TreeMap acres for each polygon as a percentage of total shapefile area
 
 Treemap acres = the acreage of the polygon that excludes non-forested pixels
 
@@ -762,7 +761,7 @@ shp_areas_df <- shp_areas_df %>%
 if(length(shapefile_df)>0){
  shp_areas_df <- full_join(shapefile_df, shp_areas_df) 
 }
-shp_areas_df
+
 areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
   mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
   arrange(TCN)
@@ -917,13 +916,18 @@ fvs_varloc <- st_as_sf(fvs_varloc) %>%
 centroids <- st_centroid(combined_shp %>% st_zm())
 circle_buffer <- st_buffer(centroids, dist = 5000)
 
-ggplot() +
+variant_fig <- ggplot() +
       geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
     geom_sf(data = ca, fill = NA)+
    geom_sf(data = circle_buffer, col = "red", fill = "red")
 ```
 
 # Important info for FVS runs:
+
+```{r}
+variant_fig
+```
+
 ```{r}
 plot_all
 flextable(areas_table)
