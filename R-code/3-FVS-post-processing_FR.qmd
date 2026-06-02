@@ -20,6 +20,7 @@ source("treatment_vars.R", local = TRUE)
 require(dplyr)
 require(readxl)
 require(ggplot2)
+require(flextable)
 ```
 
 ## Project = `r proj_name`
@@ -89,8 +90,6 @@ if(type == "IA"){
 }
 ```
 
-
-
 # Delete non-forested stands & mutate stand ID to match FVS output format
 ```{r}
 areas <- areas %>% 
@@ -98,6 +97,8 @@ areas <- areas %>%
   mutate(Stand_ID = as.character(TM_ID))
 ```
 
+
+# Plot average aboveground live values
 ```{r}
 df_means <- df %>% 
   group_by(Year, MgmtID) %>% 
@@ -113,7 +114,8 @@ ggplot(df_means) +
   geom_line(aes(x = Year, y = Aboveground_Total_Live, col = MgmtID, group = MgmtID)) +
   labs(
     y = "Live Aboveground Carbon (C)") +
-  theme_minimal()
+  theme_minimal()+
+  ggtitle("AVERAGE AGL carbon across stands (not weighted by area of each stand)")
 ```
 
 # Plot by treatment and stand, carbon over time
@@ -197,17 +199,11 @@ df_list <-  unique(df$MgmtID)
 ```
 
 ```{r}
-
-# Loop through each data frame
 for (name in df_list) {
   df_i <- df %>% 
     filter(MgmtID == name)
    
   df_i <- left_join(df_i, areas, join_by(StandID==Stand_ID))
-  
-  # JUST FOR MARSHALL AND SEARS
-  df_i <- df_i %>% 
-    filter(!is.na(TM_ID))
   
   if (any(is.na(df_i$TM_ID))) {
     message("ERROR: The TM_ID column in the FVS output file and the areas file don't match.")
@@ -227,6 +223,7 @@ for (name in df_list) {
   sum <- sum(df_carbon$Total_C)
  
   print(paste("total C in", name, "=", round(sum, 0), "MTC"))
+  
   assign(paste(name, "sum_C", sep = "_"), sum)
   
   if(("TRNF"==name| "TRPM" ==name) & "LIVECRM" %in% names(df_i)){
@@ -243,4 +240,20 @@ for (name in df_list) {
 }
 ```
 
+# Print tables for treatment area carbon by stand ID
+```{r}
+if(type=="TA"){
+   TRNF <- TRNF %>% 
+    mutate(Carbon_per_ac_TRNF = round(Total_Carbon,2), area_ac = round(area_ac,2), Total_C_TRNF = round(Total_C,2)) %>% 
+    select(StandID, Carbon_per_ac_TRNF, area_ac, Total_C_TRNF)
+  
+   TRWF <- TRWF %>% 
+    mutate(Carbon_per_ac_TRWF = round(Total_Carbon,2), area_ac = round(area_ac,2), Total_C_TRWF = round(Total_C,2)) %>% 
+    select(StandID, Carbon_per_ac_TRWF, area_ac, Total_C_TRWF)
+
+   TRNF_TRWF <- full_join(TRNF, TRWF) %>% 
+     select(StandID, area_ac, Carbon_per_ac_TRNF, Carbon_per_ac_TRWF, Total_C_TRNF, Total_C_TRWF)
+  flextable(TRNF_TRWF) 
+}
+```
 
