@@ -616,12 +616,22 @@ ignore_ia()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
-# ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
+ignore_ia()
 ```
 
+## Remove treatment areas from impact areas where they overlap
+```{r}
+buff_combined <- st_difference(buff_combined, st_union(combined_shp))
+```
 
 #### Map final impact area boundaries
 ```{r}
