@@ -486,7 +486,7 @@ for (i in 1:length(shp_list)) {
   map <- ggplot() +
     geom_sf(data = intersected_sf,aes(fill = as.factor(TM_ID)), color = NA )+
     labs(fill = "TreeMapper ID (TM_ID)")+
-    theme(legend.position = "none")+
+    #theme(legend.position = "none")+
     geom_sf(data = shp_sf, fill = NA)
   
   map_list[[map_name]] <- map
@@ -615,7 +615,7 @@ ignore_ia()
 ignore_ia()
 ignore_ia()
 ignore_ia()
-# ignore_ia()
+ignore_ia()
 # ignore_ia()
 # ignore_ia()
 # ignore_ia()
