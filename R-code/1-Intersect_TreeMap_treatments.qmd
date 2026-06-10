@@ -59,8 +59,15 @@ lapply(required_packages, require, character.only = TRUE)
 
 # Create necessary folders if they don't already exist
 ```{r}
-if (!dir.exists("../../temp")) {
-  dir.create("../../temp")
+if (!dir.exists("../../areas")) {
+  dir.create("../../areas")
+}
+if (!dir.exists("../../final_polygons")) {
+  dir.create("../../final_polygons")
+}
+final_pol_proj_dir <- paste0(final_polygons_dir,"/", project_ID)
+if (!dir.exists(final_pol_proj_dir )) {
+  dir.create(paste(final_polygons_dir, project_ID, sep = "/" ))
 }
 if (!dir.exists("../../FVS_Input")) {
   dir.create("../../FVS_Input")
@@ -243,7 +250,7 @@ for(i in 1:length(shp_list)){
 ```
 
 
-# NEW STEP: If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
+## NEW STEP: If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
 ```{r}
 shp_list_new <- list()
 for(i in 1:length(shp_list)){
@@ -260,7 +267,7 @@ for(i in 1:length(shp_list)){
 shp_list <- shp_list_new
 ```
 
-# Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
+## Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
 ```{r, warning = FALSE}
 for(i in 1:length(shp_list)){
   shp_i <- shp_list[[i]]
@@ -289,7 +296,7 @@ for(i in 1:length(shp_list)){
 }
 ```
 
-# NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
+## NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
 ```{r}
 if(length(combine_tcns)>0){
   idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns))
@@ -329,7 +336,6 @@ if(length(combine_tcns_2)>0){
   shp_list[[length(shp_list)+1]] <- combined_shp
 }
 ```
-
 
 # Overlap treatments and FVS variants
 
@@ -389,6 +395,14 @@ shp_list <- lapply(shp_list, function(df) {
   
   return(df)
 })
+```
+
+# Save edited treatment polygons as shapefiles
+```{r}
+for (i in 1:length(shp_list)) {
+  shp_sf <- shp_list[[i]]
+  st_write(obj = shp_sf, dsn = paste0(final_pol_proj_dir,"/", project_ID, "_", shp_sf$TCN, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+}
 ```
 
 ## Combine all sf objects for mapping
@@ -486,7 +500,6 @@ for (i in 1:length(shp_list)) {
   # Write results to table and to shapefile
   file_name <- paste(temp_dir, "/", project_ID, "_", shp_sf$TCN, "_areas.xlsx", sep = "")
   write_xlsx(intersected, file_name)
-  
     print(paste0(unique(shp_sf$TCN), ": Created areas files" ))
   
     # Plot using ggplot2
