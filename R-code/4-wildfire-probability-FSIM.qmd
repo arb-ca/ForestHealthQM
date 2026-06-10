@@ -27,11 +27,12 @@ library(stringr)
 
 ## Load data
 
-### Original treatment shapefiles 
+### Final treatment shapefiles 
+
+Note: If shapefiles were separated or combined in Script 1, the below shapefiles reflect those changes.
 ```{r}
-# List all shapefiles in nested folders
 shp_files <- list.files(
-  trt_dir,
+  paste(final_polygons_dir, project_ID, sep = "/"),
   pattern = "\\.shp$",
   recursive = TRUE,
   full.names = TRUE
