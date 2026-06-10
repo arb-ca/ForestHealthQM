@@ -36,7 +36,8 @@ required_packages <- c(
   "openxlsx",
   "stringr",
   "tidyverse",
-  "purrr"
+  "purrr",
+  "colorspace"
 )
 
 # Install missing packages
@@ -156,10 +157,9 @@ shapefiles <- shapefiles[!duplicated(bn)]
 
 You may need to comment out these lines if your treatment polygons have "boundary" in their name.
 ```{r}
-#shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
-#shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
+shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
+shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
 ```
-
 
 ## Create shp_list
 ```{r}
@@ -280,6 +280,15 @@ for(i in 1:length(shp_list)){
 }
 ```
 
+
+## List treatment types 
+This might not show treatment types if it's not listed in the source shapefile
+```{r}
+for(i in 1:length(shp_list)){
+  print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
+}
+```
+
 # NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
 ```{r}
 if(length(combine_tcns)>0){
@@ -288,10 +297,12 @@ if(length(combine_tcns)>0){
   not_idx
   shapefiles <- unique(unlist(lapply(shp_list[idx], function(x) x$shapefile))) %>% 
     paste(collapse = ";")
+  keep_tcn <- combine_tcns[1] 
   combined_shp <- st_sf(geometry = st_union(do.call(rbind, shp_list[idx]))) %>% 
-    mutate(TCN=combine_tcns[1]) %>% 
+    mutate(TCN=keep_tcn) %>% 
     mutate(shapefiles = shapefiles)
-  
+  combine_tcns_string <- (paste(combine_tcns, collapse = " and "))
+  print(paste(combine_tcns_string, "were combined into TCN" , keep_tcn))
   shp_list <- shp_list[not_idx]
   shp_list[[length(shp_list)+1]] <- combined_shp
 }
@@ -304,9 +315,15 @@ if(length(combine_tcns_2)>0){
   not_idx
   shapefiles <- unique(unlist(lapply(shp_list[idx], function(x) x$shapefile))) %>% 
     paste(collapse = ";")
+  
+  keep_tcn <- combine_tcns_2[1] 
+  
   combined_shp <- st_sf(geometry = st_union(do.call(rbind, shp_list[idx]))) %>% 
-    mutate(TCN=combine_tcns_2[1]) %>% 
+    mutate(TCN=keep_tcn) %>% 
     mutate(shapefiles = shapefiles)
+  
+  combine_tcns_string <- (paste(combine_tcns_2, collapse = " and "))
+  print(paste(combine_tcns_string, "were combined into TCN" , keep_tcn))
   
   shp_list <- shp_list[not_idx]
   shp_list[[length(shp_list)+1]] <- combined_shp
@@ -359,16 +376,7 @@ assign_fvsvariant <- function(shp) {
 shp_list <- lapply(shp_list, assign_fvsvariant)
 ```
 
-
-## List treatment types 
-This might not show treatment types if it's not listed in the source shapefile
-```{r}
-for(i in 1:length(shp_list)){
-  print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
-}
-```
-
-## Convert GrantID and VegType to character in all elements of shp_list if they exist
+## Convert GrantID, TCN, and VegType to character in all elements of shp_list if they exist
 ```{r}
 shp_list <- lapply(shp_list, function(df) {
   if ("GrantID" %in% names(df)) {
@@ -377,11 +385,11 @@ shp_list <- lapply(shp_list, function(df) {
   if ("VegType" %in% names(df)) {
     df <- df %>% mutate(VegType = as.character(VegType))
   }
+  df <- df %>% mutate(TCN = as.character(TCN))
+  
   return(df)
 })
-
 ```
-
 
 ## Combine all sf objects for mapping
 ```{r}
@@ -392,17 +400,17 @@ combined_shp <- st_make_valid(combined_shp %>% st_zm)
 ```
 
 ```{r}
-
 combined_shp <- combined_shp %>%
   mutate(area = st_area(geometry)) %>%
   arrange(desc(area))  # Largest first
-
 ```
-
 
 ```{r}
 plot_all <- ggplot(combined_shp)+
-  geom_sf(aes(fill = TCN), alpha = .3) 
+  geom_sf(aes(fill = TCN), alpha = .5) +
+  scale_fill_discrete_qualitative(palette = "Dark3") +
+  theme_minimal()
+
 plot_all
 ```
 
