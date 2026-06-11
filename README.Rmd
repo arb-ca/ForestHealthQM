@@ -252,6 +252,10 @@ Note: This is only necessary for TCNs that Script 1 identified as needing impact
 6.  [Configure and run Script 5 for each of the FVS output files](#6-configure-and-run-script-5-for-each-of-the-fvs-output-files)
 7.  [Return to the Forest Restoration & Management Calculator Tool excel file](#7-return-to-the-forest-restoration--management-calculator-tool-excel-file)
 
+### A note about site preparation and planting activities
+
+If a project includes only site preparation or only planting, the Reforestation portion of the QM can be completed to reflect only those activities. The Calculator Tool includes a toggle for whether the reforestation activity includes site preparation, planting, or both.
+
 ### 1. Prepare files
 
 -   Refer to the [Data and software downloads table](#downloading-data-and-software) to identify the data and scripts required.
