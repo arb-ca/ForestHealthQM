@@ -91,7 +91,7 @@ Use these selections in FVS when instructed in the procedures below.
   - Save the LANDFIRE fuel raster for California in the folder
     `ForestHealthQM/R-code/gigafire-randig-calfire-lemma/data/base_data`<br>
 
-### 2. Open the Forest Restoration & Management Calculator Tool Excel file
+### 2. Open the [Forest Restoration & Management Calculator Tool](https://gcc02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fww2.arb.ca.gov%2Fsites%2Fdefault%2Ffiles%2Fauction-proceeds%2FFRM_Calculator_Tool25-26%2520Final%2520Revised%2520Apr14.xlsx&data=05%7C02%7CCarmen.Tubbesing%40arb.ca.gov%7Cf79c4c053fa942e8780408de9b04b26a%7C9de5aaee778840b1a438c0ccc98c87cc%7C0%7C0%7C639118641672841471%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=HevUDQn9fXEbmzVA1pppavKzCw412bu1ywbUiaIMfnQ%3D&reserved=0) Excel file
 
 - populate the green cells with project information.
 
@@ -106,16 +106,18 @@ Use these selections in FVS when instructed in the procedures below.
 ### 4. Run Scripts 1 and 2
 
 - These end in “.qmd”
-- To run each script in Rstudio, hit “Render” at the top
+- Open each script in Rstudio and then click “Render” at the top. Wait
+  for Script 1 to finish rendering before rendering Script 2.
 - You only need to run each of these scripts once per project, even if
   there are multiple treatment types.
 - They read in all shapefiles in a specified folder, prepare them for
-  FVS, and save files used as inputs for TRIAADS and FVS  
+  FVS, and save files used as inputs for TRIAADS and FVS
 - In cases where impact areas within a project overlap, Script 1 does
-  not create impact area files for every treatment (See Section II,
-  Overlapping Treatment Areas)<br>
-- After running each script, find the .html that was generated and add
-  the Project ID to its name
+  not create impact area files for every treatment. Script 1 also cuts
+  out portions of impact areas that overlap with the boundaries of other
+  treatment activities. <br>
+- After running each script, find the .html that was generated in the
+  folder `R-code` and add the Project ID to its name
   - e.g. rename `1-Intersect_TreeMap_treatments` to
     `1-Intersect_TreeMap_treatments_25-WP-NEU-79327857`
   - This way, when you run the script again for another project, you
@@ -138,8 +140,8 @@ Use these selections in FVS when instructed in the procedures below.
     [FVS input variables table](#fvs-input-values), leaving other values
     as defaults
   - Add natural regeneration
-    - Under Editor, upload the regeneration file for the project’s FVS
-      variant that has “species” in the name
+    - Under Editor, upload the REGIMPUTE regeneration file for the
+      project’s FVS variant that has “species” in the name
       - Example: `Regen_SpeciesMethod_NC.kcp`
     - Save in run
 - Select outputs
@@ -191,6 +193,8 @@ Use these selections in FVS when instructed in the procedures below.
   - Delete SimFire
   - Rename MgmtID to **TRNF** and Run
 - Download FVS outputs in the `View Outputs` tab
+  - Wait until all runs have completed and the box under “Background run
+    status” is empty.
   - Under `Load`, select all runs → choose `FVS_Carbon` and
     `FVS_Compute` → `Explore`
     - Select all stands and all years
@@ -199,7 +203,7 @@ Use these selections in FVS when instructed in the procedures below.
     - Save as: `FVS_Output/ProjectID` + TCN + `_treatment_carbon`
       - Example:
         `FVS_Output/8GG24601/8GG24601_1.4_treatment_carbon.xlsx`
-  - Return to Load  
+  - Return to `Load`
   - For BSNF and TRNF, select `FVS_PotFire` and `FVS_StrClass`
     - Select only the year 5 years after treatment
     - Select all variables
@@ -348,6 +352,13 @@ the the bottom of the Script 1 rendered html.
     files](#6-configure-and-run-script-5-for-each-of-the-fvs-output-files)
 7.  [Return to the Forest Restoration & Management Calculator Tool excel
     file](#7-return-to-the-forest-restoration--management-calculator-tool-excel-file)
+
+### A note about site preparation and planting activities
+
+If a project includes only site preparation or only planting, the
+Reforestation portion of the QM can be completed to reflect only those
+activities. The Calculator Tool includes a toggle for whether the
+reforestation activity includes site preparation, planting, or both.
 
 ### 1. Prepare files
 
