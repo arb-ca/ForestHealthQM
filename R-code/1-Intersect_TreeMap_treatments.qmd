@@ -405,6 +405,7 @@ shp_list <- lapply(shp_list, function(df) {
 
 # Save edited treatment polygons as shapefiles
 ```{r}
+unlink(final_pol_proj_dir)
 for (i in 1:length(shp_list)) {
   shp_sf <- shp_list[[i]]
   st_write(obj = shp_sf, dsn = paste0(final_pol_proj_dir,"/", project_ID, "_", shp_sf$TCN, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
