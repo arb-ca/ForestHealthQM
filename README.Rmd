@@ -87,9 +87,11 @@ Use these selections in FVS when instructed in the procedures below.
 - You only need to run each of these scripts once per project, even if there are multiple treatment types.
 - They read in all shapefiles in a specified folder, prepare them for FVS, and save files used as inputs for TRIAADS and FVS
 - In cases where impact areas within a project overlap, Script 1 does not create impact area files for every treatment. Script 1 also cuts out portions of impact areas that overlap with the boundaries of other treatment activities. <br>
-- After running each script, find the .html that was generated in the folder `R-code` and add the Project ID to its name
-  - e.g. rename `1-Intersect_TreeMap_treatments` to `1-Intersect_TreeMap_treatments_25-WP-NEU-79327857`
-  - This way, when you run the script again for another project, you won't overwrite this render
+- After running each script, find the .html that was generated in the folder `R-code` 
+  - Scroll through the file and look for errors. These will show up in large red text. If you see one, fix the problem and re-run the script.
+  - Add the Project ID to its name
+      - e.g. rename `1-Intersect_TreeMap_treatments` to `1-Intersect_TreeMap_treatments_25-WP-NEU-79327857`
+      - This way, when you run the script again for another project, you won't overwrite this render
 
 ### 5. Run FVS simulations for the Treatment Area
 
@@ -103,7 +105,7 @@ Use these selections in FVS when instructed in the procedures below.
 - Configure for all runs
   - Set `Time`, `CarbCalc`, and `FireCalc` variables according to the [FVS input variables table](#fvs-input-values), leaving other values as defaults
   - Add natural regeneration
-    - Under Editor, upload the REGIMPUTE regeneration file for the project's FVS variant that has "species" in the name
+    - Under Components > Editor, upload the REGIMPUTE regeneration file for the project's FVS variant that has "species" in the name
       - Example: `Regen_SpeciesMethod_NC.kcp`
     - Save in run
 - Select outputs

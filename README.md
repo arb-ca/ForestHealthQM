@@ -117,11 +117,15 @@ Use these selections in FVS when instructed in the procedures below.
   out portions of impact areas that overlap with the boundaries of other
   treatment activities. <br>
 - After running each script, find the .html that was generated in the
-  folder `R-code` and add the Project ID to its name
-  - e.g. rename `1-Intersect_TreeMap_treatments` to
-    `1-Intersect_TreeMap_treatments_25-WP-NEU-79327857`
-  - This way, when you run the script again for another project, you
-    won’t overwrite this render
+  folder `R-code`
+  - Scroll through the file and look for errors. These will show up in
+    large red text. If you see one, fix the problem and re-run the
+    script.
+  - Add the Project ID to its name
+    - e.g. rename `1-Intersect_TreeMap_treatments` to
+      `1-Intersect_TreeMap_treatments_25-WP-NEU-79327857`
+    - This way, when you run the script again for another project, you
+      won’t overwrite this render
 
 ### 5. Run FVS simulations for the Treatment Area
 
@@ -140,8 +144,8 @@ Use these selections in FVS when instructed in the procedures below.
     [FVS input variables table](#fvs-input-values), leaving other values
     as defaults
   - Add natural regeneration
-    - Under Editor, upload the REGIMPUTE regeneration file for the
-      project’s FVS variant that has “species” in the name
+    - Under Components \> Editor, upload the REGIMPUTE regeneration file
+      for the project’s FVS variant that has “species” in the name
       - Example: `Regen_SpeciesMethod_NC.kcp`
     - Save in run
 - Select outputs

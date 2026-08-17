@@ -1,7 +1,11 @@
 ---
 title: "Reformat form responses"
-format: html
-editor: visual
+author: "Carmen Tubbesing"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    embed-resources: TRUE
+    toc: TRUE
 ---
 
 ```{r, include = F}
@@ -13,36 +17,138 @@ require(writexl)
 # Load form responses
 
 ```{r}
-df <- read_excel("../../form_responses/Forest Restoration & Management QM Oct15 2025.xlsx")
+df <- read_excel("C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/online form/Forest Restoration & Management QM 2.xlsx")
 ```
 
-# Define the question number within the fuels treatment section that asks which fuels treatment type
-
+# Define what row you want to start on
 ```{r}
-fuels_question <- "What type of fuels reduction is this activity?"
+start_id <- 165
+start_id_supp <- 4
 ```
 
-# Identify key columns that tell you which project type exists
+# Replace non-breaking spaces with normal spaces
+```{r}
+names(df) <- gsub("\u00A0", " ", names(df))
+```
+
+# Define questions that are in the wrong order
+```{r}
+fuels_acreage_1_q <-  "How many acres will be treated in this Fuels Reduction Activity 1?" 
+fuels_acreage_2_q <- "How many acres will be treated in Fuels Reduction Activity 2?"  
+fuels_acreage_3_q <- "How many acres will be treated in Fuels Reduction Activity 3?" 
+fuels_acreage_4_q <- "How many acres will be treated in Fuels Reduction Activity 4?" 
+fuels_site_class_1_q <- "What is the Forest Productivity Site Class in the area where Fuels Reduction Activity 1 will occur?" 
+fuels_site_class_2_q <- "What is the Forest Productivity Site Class in the area where Fuels Reduction Activity 2 will occur?"
+fuels_site_class_3_q <- "What is the Forest Productivity Site Class in the area where this treatment will occur?1" 
+fuels_site_class_4_q <-  "What is the Forest Productivity Site Class in the area where this treatment will occur?"
+```
+
+# Find the column numbers of those columns
 
 ```{r}
-id_q <- 14
-reforestation_yn <- 18
-reforestation_2 <- 33
-reforestation_3 <- 48
-pest_yn <- 64
-biomass_yn <- 78
-conservation_yn <- 94
-fuel_yn <- 105
+fuels_acreage_1_id <- match(fuels_acreage_1_q, names(df))
+fuels_acreage_1_id
+fuels_acreage_2_id <- match(fuels_acreage_2_q, names(df))
+fuels_acreage_2_id
+fuels_acreage_3_id <- match(fuels_acreage_3_q, names(df))
+fuels_acreage_3_id
+fuels_acreage_4_id <- match(fuels_acreage_4_q, names(df))
+fuels_acreage_4_id
+
+
+site_class_1_id <- match(fuels_site_class_1_q, names(df))
+site_class_1_id
+site_class_2_id <- match(fuels_site_class_2_q, names(df))
+site_class_2_id
+site_class_3_id <- match(fuels_site_class_3_q, names(df))
+site_class_3_id
+site_class_4_id <- match(fuels_site_class_4_q, names(df))
+site_class_4_id
+```
+
+The column number for the first fuels reduction acreage question is `r fuels_acreage_1_id`. \
+The column number for the second fuels reduction acreage question is `r fuels_acreage_2_id`. \
+The column number for the first site class question is `r site_class_1_id`. \
+The column number for the second site class question is `r site_class_2_id`
+
+# Identify Project ID column
+
+```{r}
+id_q<- match("Please enter the Applicant ID or Grant ID for your CCI project. ", names(df))
+names(df)[id_q] <- "Project_ID_CCI"
+id_q_prop4 <- match("Please enter the Applicant ID for your Prop 4 application.", names(df))
+names(df)[id_q_prop4] <- "Project_ID_Prop4"
+```
+
+## Create a project ID column that's the CCI ID, unless there is no CCI ID, in which case it's the Prop 4 ID
+
+```{r}
+df <- df %>% 
+  mutate(Project_ID = ifelse(Project_ID_CCI %in% c("NA", "N/A", "n/a"), Project_ID_Prop4, Project_ID_CCI))
+```
+
+```{r}
+siteprep_yn <-  "Does your project include site preparation?" 
+siteprep_2  <- "Does your project include additional site prep activities?" 
+```
+
+```{r}
+siteprep_yn <- match(siteprep_yn, names(df))
+siteprep_yn
+siteprep_2 <- match(siteprep_2, names(df))
+siteprep_2
+
+```
+
+```{r}
+reforestation_yn <-  "Does your project include planting for reforestation?" 
+ reforestation_2  <- "Does your project contain additional reforestation activity(ies)?1" 
+reforestation_3 <- "Does your project contain additional reforestation activity(ies)?" 
+```
+
+```{r}
+reforestation_yn <- match(reforestation_yn, names(df))
+reforestation_yn
+reforestation_2  <- match(reforestation_2 , names(df))
+reforestation_2 
+reforestation_3 <- match(reforestation_3, names(df))
+reforestation_3
+```
+
+```{r}
+pest_yn_q <- "Does your project include pest management?"
+biomass_yn_q <- "Does your project include biomass utilization?"
+fuels_yn_q <- "Does your project include fuels reduction treatments or broadcast burn(s)?"
+fuels_2_q <- "Does your project contain additional fuel reduction treatments?"
+fuels_3_q <- "Does your project contain additional fuel reduction activities?"
+fuels_4_q <-"Does your project contain additional fuel reduction activities?1"
+```
+
+```{r}
+pest_yn <- match(pest_yn_q, names(df))
+pest_yn
+biomass_yn <- match(biomass_yn_q, names(df))
+biomass_yn
+conservation_yn <- grep("^Does your project result in a conservation easement", names(df))
+conservation_yn
+fuels_yn <- match(fuels_yn_q, names(df))
+fuels_yn
+fuels_2 <- match(fuels_2_q, names(df))
+fuels_2
+fuels_3 <- match(fuels_3_q, names(df))
+fuels_3
+fuels_4 <- match(fuels_4_q, names(df))
+fuels_4
 ```
 
 # Define function to create each of the six sub-data-frames
 
 ```{r}
 convert_df <- function(df, row, col_min, col_max){
-  df_new <- df[row, col_min:col_max] %>% t() %>% as_tibble()
+    df_new <- df[row, c(col_min:col_max)] %>% t() %>% as_tibble()
   colnames(df_new) <- "Answer"
   df_new <- df_new %>% 
-    mutate(Question = colnames(df[col_min:col_max])) %>% 
+    mutate(Question = colnames(df[c(col_min:col_max)])) %>% 
     select(Question, Answer)
   return(df_new)
 }
@@ -51,22 +157,39 @@ convert_df <- function(df, row, col_min, col_max){
 # Transpose, clean, and write an excel file for each project
 
 ```{r}
+df_full <- df
+df <- df %>% filter(Id>=start_id)
 for(i in 1:nrow(df)){
-  id <- df[i, id_q] %>% unlist()
+  id <- df[i, "Project_ID"] %>% unlist()
+  name <- df[i, "Project Name"] %>% unlist()
   if(is.na(id)){
-    id <- df[i, "Project Name"]
+    id <- name
+  }
+  if(sum(na.omit(df_full$Project_ID) == id) >= 2){
+    print("ALERT! This project ID has already been submitted. Please delete duplicate response and start over.")
+  }
+  if(sum(df_full$`Project Name` == name) >= 2 ){
+    print("ALERT! This project name has already been submitted. Please delete duplicate response and start over.")
   }
   print(unlist(id))
-  df1 <- convert_df(df=df, row=i, 1, reforestation_yn-1)
-  df2 <- convert_df(df=df, row=i, reforestation_yn, pest_yn-1)
-  df3 <- convert_df(df=df, row=i, pest_yn, biomass_yn-1)
-  df4 <- convert_df(df=df, row=i, biomass_yn, conservation_yn-1)
-  df5 <- convert_df(df=df, row=i, conservation_yn, fuel_yn-1)
-  df6 <- convert_df(df=df, row=i, fuel_yn, ncol(df))
+  df1 <- convert_df(df=df, row=i, col_min=1, col_max = siteprep_yn-1)
+  df2 <- convert_df(df=df, row=i, siteprep_yn, pest_yn-1)
+  df3 <- convert_df(df=df, row=i, pest_yn, biomass_yn-1) %>% 
+    filter(Question != fuels_acreage_1_q)
+  df4 <- convert_df(df=df, row=i, biomass_yn, conservation_yn-1) %>% 
+    filter(Question != fuels_acreage_2_q)
+  #df5 <- convert_df(df=df, row=i, conservation_yn, fuels_yn-1) %>% 
+   # filter(Question != fuels_site_class_1_q)
+  df6 <- convert_df(df=df, row=i, col_min=fuels_yn, col_max = fuels_2-1)
+  df7 <- convert_df(df=df, row=i, fuels_2, fuels_3-1)
+  df8 <- convert_df(df=df, row=i, fuels_3, fuels_4-1)
+  df9 <- convert_df(df=df, row=i, fuels_4, ncol(df)-1)
+  
+  df6 <- bind_rows(df6, df7, df8, df9)
   
   # Remove questions where the answer is NA for all 6 dfs
-  dfs <- c("df1", "df2", "df3", "df4", "df5", "df6")
-  for(j in 1:6){
+  dfs <- c("df1", "df2", "df3", "df4",  "df6")
+  for(j in 1:length(dfs)){
       dfj <- get(dfs[j])
       dfj <- dfj[!is.na(dfj$Answer), ]
       assign(dfs[j], dfj)
@@ -82,13 +205,75 @@ for(i in 1:nrow(df)){
 
   
   # Write to excel
-  file_name <- paste0("../../form_responses/", id, ".xlsx")
+  file_name <- paste0("../../form_responses/raw/", id, ".xlsx")
   sheets <- list("Project"=df1, 
                  "Reforestation" =df2, 
                  "Pest_management"=df3, 
                  "Biomass"=df4, 
-                 "Conservation"=df5, 
                  "Fuels_Reduction"=df6)
   write_xlsx(sheets, file_name)
 }
+print("finished reshaping responses from main form")
+```
+
+# Repeat for supplementary data
+
+## Load
+```{r}
+dfs <- read_excel("C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/online form/Intake Form Supplementary.xlsx")
+```
+
+## Rename ID column
+
+```{r}
+head(names(dfs), n=15)
+id_q<- grep("Prop 4 Forest Health", names(dfs)) 
+id_q
+names(dfs)[id_q] <- "Project_ID_Prop4"
+```
+
+```{r}
+id_q<- grep("CCI Forest Health project",names(dfs)) 
+id_q
+names(dfs)[id_q] <- "Project_ID_CCI"
+```
+
+##Replace non-breaking spaces with normal spaces
+```{r}
+names(dfs) <- gsub("\u00A0", " ", names(dfs))
+```
+
+```{r}
+dfs <- dfs %>% filter(Id>=start_id_supp)
+dfs <- dfs %>% 
+  mutate(Project_ID = ifelse(Project_ID_CCI %in% c("NA", "N/A", "n/a"), Project_ID_Prop4, Project_ID_CCI))
+for(i in 1:nrow(dfs)){
+  num <- dfs[i, "Id"] %>% unlist()
+  id <- dfs[i, "Project_ID"] %>% unlist()
+  name <- dfs[i, "Project Name"] %>% unlist()
+  if(is.na(id)){
+    id <- name
+  }
+  print(unlist(id))
+  dfi <- dfs[i,] %>% t() %>% as_tibble()
+  colnames(dfi) <- "Answer"
+  
+  # Remove unnecessary columns like start time and end time
+  unnecessary_qs <- c("Id", "Completion time", "Start time", "Email", "Name", "Last modified time")
+  dfi <- dfi %>% 
+    mutate(Question = colnames(dfs)) %>% 
+    filter(!Question %in% unnecessary_qs) %>% 
+    select(Question, Answer)
+  
+  dfi_remove <- which(grepl("Does your project contain additional fuel reduction treatments?", dfi$Question))
+  dfi <- dfi[-dfi_remove,]
+  
+  # Remove empty cells
+  dfi <- dfi[!is.na(dfi$Answer), ]
+  
+  # Write to excel
+  file_name <- paste0("../../form_responses/raw/supplementary/", id, "_", num, "_supp.xlsx")
+  write_xlsx(dfi, file_name)
+}
+print("Finished reshaping Supplementary responses")
 ```
