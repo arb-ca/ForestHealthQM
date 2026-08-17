@@ -102,6 +102,10 @@ Use these selections in FVS when instructed in the procedures below.
 - Open `project_vars.R`
 - Set the project name and project ID
 - Set the TreeMap vintage (“tm”) based on the year of your treatments
+  - Options are 2016, 2020, and 2022. Most projects will use 2022,
+    unless the QM is being run retroactively for older treatments.
+    Choose the year that is closest to your treatment year without being
+    after it.
 - Define the project name, treatment name, and folder where treatment
   shapefiles are located (“trt_dr”)<br>
 
@@ -132,38 +136,47 @@ Use these selections in FVS when instructed in the procedures below.
 ### 5. Run FVS simulations for the Treatment Area
 
 - Open the FVS software and start a new project
+  - To do this, go to `Manage Projects` → `Manage Project.` Type a new
+    project title (such as your project_ID + TCN), click “Make new
+    project”, then go above to “Open selected project” and open it.
 - Under `Manage Project` –\> `Import input data`, upload the treatment
-  area FVS input file into FVS
+  area FVS input file into FVS by clicking “Browse” under “Step 1.”
   - These files will be located in the folder `FVS_Input` and will
     follow the naming convention “FVS_input\_” + project_ID + TCN
     - Example: `FVS_input_8GG24601_3.3.xlsx`
   - Then select `Install uploaded database`
-- Under `Simulate`, select `All_Stands` and click
-  `Add stands in selected groups.`
+- Under `Simulate`→ `Stands`, select `All_Stands` in the “Groups”
+  section and click `Add stands in selected groups` toward the bottom of
+  the screen.
   - This adds all stands in the input data to your simulation.
 - Configure for all runs
   - Set `Time`, `CarbCalc`, and `FireCalc` variables according to the
     [FVS input variables table](#fvs-input-values), leaving other values
     as defaults
   - Add natural regeneration
-    - Under Components \> Editor, upload the REGIMPUTE regeneration file
-      for the project’s FVS variant that has “species” in the name
+    - Under Editor (`Simulate` → `Components` → `Editor`), upload the
+      REGIMPUTE regeneration file for the project’s FVS variant that has
+      “species” in the name
       - Example: `Regen_SpeciesMethod_NC.kcp`
-    - Save in run
-- Select outputs
-  - Carbon and fuels
-  - Fire and mortality
-  - Stand structure
+    - Click `Save in run` below `Existing component collection`
+- Select outputs:
+  - ✅`Carbon and fuels`
+  - ✅`Fire and mortality`
+  - ✅`Stand structure`
 - Rename the run BSNF (for baseline no fire)
-- Under `*Run*`, title the MgmtID as **BSNF**, then select
+- Under `Simulate`→ `*Run*`, title the MgmtID as **BSNF**, then select
   `Run in background`
   - Choose the number of cores you want to use. Consider using a third
     to a quarter of the cores on your computer so that you can run
     multiple FVS simulations in the background at the same time.
   - Hit `Save and Run`
+    - For a slow computer, consider waiting for one run to finish before
+      continuing to the following steps.
 - Configure and run BSWF (Baseline With Fire)
   - Duplicate the BSNF run and rename it **BSWF**, then save
   - Add the **SimFire** keyword under the Fire and Fuels Extension
+    (`Simulate` → `Components` → `Keywords` →
+    `Fire and Fuels Extension`)
     - Year or cycle number: 5 years after treatment
       - *Note:* If treatment spans multiple years (e.g.,
         thin/pile/burn), SimFire occurs 5 years after the **first**
@@ -177,8 +190,8 @@ Use these selections in FVS when instructed in the procedures below.
   - Rename MgmtID to **BSWF** and Run
 - Configure and run TRWF (Treatment With Fire)
   - Duplicate the BSWF run and rename as **TRWF**
-  - Under `Components` → `Management` → `Fuel Treatments`, select the
-    appropriate fuel treatment type
+  - Under `Simulate` → `Components` → `Management` → `Fuel Treatments`,
+    select the appropriate fuel treatment type
     - Choose from: Thin from Below, Mastication, Prescribed burn, Thin
       with fuel piled and burned, Pile burn surface fuel
     - Enter treatment‑specific information from the project details.
@@ -197,12 +210,17 @@ Use these selections in FVS when instructed in the procedures below.
 - Configure TRNF (Treatment No Fire)
   - Duplicate the TRWF run and rename as **TRNF**
   - Delete SimFire
+    - (Select the SimFire from the “Simulation Contents” on the far
+      left. Once selected, click the “Cut/Delete” button.)
   - Rename MgmtID to **TRNF** and Run
 - Download FVS outputs in the `View Outputs` tab
   - Wait until all runs have completed and the box under “Background run
     status” is empty.
-  - Under `Load`, select all runs → choose `FVS_Carbon` and
-    `FVS_Compute` → `Explore`
+  - Under `Load`, “Runs to Consider,” select all runs (TRNF, TRWF, BSWF,
+    and BSNF)
+  - Under `Database tables to consider`, choose `FVS_Carbon` and
+    `FVS_Compute`
+  - Next, go to `Explore`
     - Select all stands and all years
     - Select variables: `MgmtID`, `StandID`, `Year`,
       `Aboveground_Total_Live`, `Belowground_Live`, `LIVECREM`
@@ -211,8 +229,9 @@ Use these selections in FVS when instructed in the procedures below.
         `FVS_Output/8GG24601/8GG24601_1.4_treatment_carbon.xlsx`
   - Return to `Load`
   - For BSNF and TRNF, select `FVS_PotFire` and `FVS_StrClass`
-    - Select only the year 5 years after treatment
-    - Select all variables
+    - In the `Years` section, select only the year 5 years after
+      treatment
+    - Under `Database variables to consider`, select all variables
     - Save as: Save as: `FVS_Output/Project ID/ProjectID` + TCN +
       `_treatment_TRIAADS`
       - Example:
@@ -224,15 +243,16 @@ Note: This is only necessary for TCNs that Script 1 identified as
 needing impact area analysis. To find out which TCNs those are, scroll
 the the bottom of the Script 1 rendered html.
 
-- Start a new project in FVS
+- Start and open a new project in FVS. Distinguish the title to show it
+  is for Impact Area (e.g. your project ID + TCN + “IA”)
 - Under `Manage Projects` → `Import input data`, upload the Impact Area
   FVS input file generated from Script 2, then click
   `Install uploaded database`.
   - This files will be located in the folder `FVS_Input` and will follow
     the naming convention “FVS_input_IA” + Project_ID + TCN
-- Under **Simulate**, select “All_Stands” and click “Add stands in
-  selected groups.” This adds all stands in the input data to your
-  simulation.
+- Under `Simulate` → `Stands`, select “All_Stands” in the `Groups`
+  section and click “Add stands in selected groups.” This adds all
+  stands in the input data to your simulation.
 - Configure for all runs
   - Set Time, CarbCalc, and FireCalc variables according to the [FVS
     input variables table](#fvs-input-values), leaving other values as
@@ -243,10 +263,10 @@ the the bottom of the Script 1 rendered html.
       the file name.
       - Example: `Regen_SpeciesMethod_NC.kcp`
     - Save in run
-- Select outputs
-  - Carbon and fuels
-  - Fire and mortality
-  - Stand structure
+- Select outputs:
+  - ✅`Carbon and fuels`
+  - ✅`Fire and mortality`
+  - ✅`Stand structure`
 - Rename `Run title` as IANF (for Impact Area No Fire)
 - Under *Run*, title the MgmtID as IANF, then select “Run in background”
 - Configure and run for wildfire scenario
