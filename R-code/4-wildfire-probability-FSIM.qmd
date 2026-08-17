@@ -23,6 +23,7 @@ library(sf)
 library(dplyr)
 library(terra)
 library(stringr)
+library(flextable)
 ```
 
 ## Load data
@@ -84,15 +85,23 @@ for (shp_path in shp_files) {
     mean_results,
     data.frame(
       shapefile = basename(shp_path),
-      mean_value = m_val*100
+      mean_value = paste0(round(m_val*100, 4), "%")
     )
   )
   plot(clipped_raster)
   plot(v_shp, add = T)
 }
-
-# View final table
-print(mean_results)
 ```
 
-This is the probability expressed as a percentage. For example, 0.07 is a 0.07% or 0.0007 probability. 
+# View final results
+```{r}
+results <- mean_results %>% 
+  rename("Mean probability of wildfire occurrence" = mean_value)
+results <- flextable(results)
+results <- bold(results, j = 2)
+results <- fontsize(results, size = 14, part = "all")
+results <- width(results, width = 4)
+results
+```
+
+**Tip**: When you enter this value into the Calculator tool, double check that the decimal point is in the right place!
