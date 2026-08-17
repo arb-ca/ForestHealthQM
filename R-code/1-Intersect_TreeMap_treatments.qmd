@@ -14,12 +14,6 @@ source("project_vars.R", local = TRUE)
 
 # This run is for project `r project_ID`, AKA `r proj_name`
 
-# Files needed:
-
--   TreeMap datasets, clipped to CA (.tif for each year)
--   A directory with treatment shapefiles within it (can be in nested/zipped folders)
--   The FVS variants and locations shapefile
-
 ```{r, include = F}
 # List of required packages
 required_packages <- c(
@@ -58,7 +52,7 @@ lapply(required_packages, require, character.only = TRUE)
 ```
 
 # Create necessary folders if they don't already exist
-```{r}
+```{r, include = F}
 if (!dir.exists("../../areas")) {
   dir.create("../../areas")
 }
@@ -135,8 +129,6 @@ zip_files <- list.files(trt_dir, pattern = "\\.zip$", full.names = TRUE)
 for (zip_file in zip_files) {
   unzip(zip_file, exdir = trt_dir)
 }
-
-print("All zipped files have been extracted.")
 ```
 
 ## List shapefiles in `trt_dir`
@@ -148,12 +140,25 @@ shapefiles <- list.files(
   full.names = TRUE,
   recursive = TRUE
 )
+```
 
+# Show an error and exit the script if there aren't any shapefiles
+```{r results = 'asis'}
+if(length(shapefiles)==0){
+  cat("<div style='color:red; font-size:30px;'>")
+  print("ALERT! No shapefiles were found. Either there's a typo in the folder name or the folder is empty.")
+  cat("</div>")
+  knitr::knit_exit()
+}
+```
+
+```{r}
 shapefiles <- shapefiles[!grepl("buffer", shapefiles)]
 
 bn <- basename(shapefiles)
 bn
 ```
+
 
 ### Remove duplicates
 ```{r}
@@ -179,7 +184,7 @@ for(i in 1:length(shapefiles)){
 ```
 
 ```{r}
-print(paste("There are", length(shapefiles), "shapefiles and", length(shp_list), "polygon features, each saved in `shp_list`"))
+print(paste("There are", length(shapefiles), "shapefiles and", nrow(shp_list[[1]]), "polygon features, each saved in `shp_list`"))
 ```
 
 # Prepare shapefiles & TreeMap raster for spatial overlay
@@ -244,13 +249,14 @@ shp_list <- lapply(shp_list, rename_Tobj_column)
 ## Add shapefile name as column in shp
 ```{r}
 for(i in 1:length(shp_list)){
-    
     shp_list[[i]]$shapefile <- tools::file_path_sans_ext(basename(shapefiles[i]))
 }
 ```
 
 
-## NEW STEP: If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
+## If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
+
+IF `separate_tcns` = "no", then this will not run.
 ```{r}
 shp_list_new <- list()
 for(i in 1:length(shp_list)){
@@ -296,7 +302,7 @@ for(i in 1:length(shp_list)){
 }
 ```
 
-## NEW STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
+## OPTIONAL STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
 ```{r}
 if(length(combine_tcns)>0){
   idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns))
@@ -420,10 +426,7 @@ combined_shp <- combined_shp %>%
 ```
 
 ```{r}
-plot_all <- ggplot(combined_shp)+
-  geom_sf(aes(fill = TCN), alpha = .5) +
-  scale_fill_discrete_qualitative(palette = "Dark3") +
-  theme_minimal()
+plot_all <- mapview::mapview(combined_shp, zcol = "TCN")
 
 plot_all
 ```
