@@ -56,7 +56,9 @@ Use these selections in FVS when instructed in the procedures below.
 7.  [Configure `treatment_vars.R`](#7-configure-treatment_varsr)
 8.  [Run Scripts 3](#8-run-script-3)
 9.  [Run TRIAADS](#9-run-triaads)
-10. [Fill in the remainder of the Excel Calculator Tool](#10-fill-in-the-remainder-of-the-excel-calculator-tool)
+10.  [Run Script 4](#10-run-script-4)
+11. [Fill in the remainder of the Excel Calculator Tool](#11-fill-in-the-remainder-of-the-excel-calculator-tool)
+12.  [Check results](#12-check-results)
 
 ### 1. Prepare files
 
@@ -243,7 +245,12 @@ Note: This is only necessary for TCNs that Script 1 identified as needing impact
 
 ### 11. Fill in the remainder of the Excel Calculator Tool
 
-- Populate the yellow cells with results from the scripts and TRIAADS<br>
+- Populate the yellow cells with results from the scripts and
+  TRIAADS
+  
+### 12. Check results
+
+- Look over each of the values in tables in columns I-J and the bar chart. Do the values make sense? Are any of them negative that shouldn't be?<br>
 
 # Reforestation QM Procedure
 
