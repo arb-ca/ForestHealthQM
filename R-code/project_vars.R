@@ -1,10 +1,10 @@
-proj_name <- "Slvwd Fuel Break And Infrastructure Protection"
-project_ID <- "25-WP-CZU-79145703"
+proj_name <- "2023 MRCA Hazardous Fuels Reduction"
+project_ID <- "22-WP-LAC-47724639"
 
 
 ## Define directory with treatment shapefiles in it
 ## This can be located anywhere on your computer. It doesn't need to be in the same folder as this code
-trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/QM Runs 2026/WPGP/Shapefiles/25_WP_CZU_79145703"
+trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/training/Santiago test runs/22-WP-LAC-47724639/shapefile"
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 ### Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
@@ -12,7 +12,7 @@ noFVS <- c()
 
 ## Define which treatments get combined for FVS modeling
 ## If you only have one treatment polygon, leave this as-is
-combine_tcns <- c(paste0(1:63, "new")) #example: c("1new","2new","5new")
+combine_tcns <- c() #example: c("1new","2new","5new")
 combine_tcns_2 <- c() #example: c("3new","4new")
 
 ### The next two parameters only need to be edited if the project includes reforestation
