@@ -135,7 +135,7 @@ Use these selections in FVS when instructed in the procedures below.
 
 ### 5. Run FVS simulations for the Treatment Area
 
-- Open the FVS software and start a new project
+- [ ] Open the FVS software and start a new project
   - To do this, go to `Manage Projects` → `Manage Project.` Type a new
     project title (such as your project_ID + TCN), click “Make new
     project”, then go above to “Open selected project” and open it.
@@ -232,10 +232,15 @@ Use these selections in FVS when instructed in the procedures below.
     - In the `Years` section, select only the year 5 years after
       treatment
     - Under `Database variables to consider`, select all variables
-    - Save as: Save as: `FVS_Output/Project ID/ProjectID` + TCN +
+    - Save as: `FVS_Output/Project ID/ProjectID` + TCN +
       `_treatment_TRIAADS`
       - Example:
-        `FVS_Output/8GG24601/8GG24601_1.4_treatment_TRIAADS.xlsx`<br>
+        `FVS_Output/8GG24601/8GG24601_1.4_treatment_TRIAADS.xlsx`
+- Save your key file for future reference
+  - Under `Manage Projects` → `Downloads`, select
+    `Keyword file for current run`
+  - This creates a record of exactly what parameters your FVS run
+    included, which can be used for later reference<br>
 
 ### 6. Run FVS simulations for the Impact Area
 
