@@ -11,7 +11,7 @@ trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Document
 noFVS <- c()
 
 ## Define which treatments get combined for FVS modeling
-## If you only have one treatment polygon, leave this as-is
+## If you only have one treatment polygon, leave as empty sets: `c()` 
 combine_tcns <- c() #example: c("1new","2new","5new")
 combine_tcns_2 <- c() #example: c("3new","4new")
 
