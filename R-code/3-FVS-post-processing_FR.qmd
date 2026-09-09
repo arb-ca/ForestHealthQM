@@ -34,6 +34,7 @@ if(type == "TA"){
   fvs_output_file <- paste0(project_ID, "/", project_ID, "_", TCN, "_treatment", "_carbon")
   fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
   fvs_output_file
+  df <- read_excel(fvs_output_file, col_types = c("guess", "guess", "guess", "guess", "guess", "numeric"))
 }
 ```
 
@@ -42,11 +43,8 @@ if(type == "IA"){
   fvs_output_file <- paste0(project_ID, "/", project_ID, "_", TCN, "_IA", "_TRIAADS")
   fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
   fvs_output_file
+  df <- read_excel(fvs_output_file)
 }
-```
-
-```{r}
-df <- read_excel(fvs_output_file, col_types = c("guess", "guess", "guess", "guess", "guess", "numeric"))
 ```
 
 # Plot carbon over time for all stands, all runs 
