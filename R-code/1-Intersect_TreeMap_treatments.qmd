@@ -93,7 +93,7 @@ fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
 
 ### Clear temp directory (`temp`)
 ```{r}
-unlink(paste0(temp_dir, "/*"), recursive = TRUE)
+#unlink(paste0(temp_dir, "/*"), recursive = TRUE)
 ```
 
 ### Read in TreeMap dataset(s)

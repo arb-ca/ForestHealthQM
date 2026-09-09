@@ -224,7 +224,8 @@ Use these selections in FVS when instructed in the procedures below.
     - Select all stands and all years
     - Select variables: `MgmtID`, `StandID`, `Year`,
       `Aboveground_Total_Live`, `Belowground_Live`, `LIVECREM`
-    - Save as: `FVS_Output/ProjectID` + TCN + `_treatment_carbon`
+    - Save as: `FVS_Output/ProjectID/ProjectID` + TCN +
+      `_treatment_carbon`
       - Example:
         `FVS_Output/8GG24601/8GG24601_1.4_treatment_carbon.xlsx`
   - Return to `Load`

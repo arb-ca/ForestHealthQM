@@ -46,7 +46,7 @@ if(type == "IA"){
 ```
 
 ```{r}
-df <- read_excel(fvs_output_file)
+df <- read_excel(fvs_output_file, col_types = c("guess", "guess", "guess", "guess", "guess", "numeric"))
 ```
 
 # Plot carbon over time for all stands, all runs 
@@ -106,8 +106,6 @@ df_means <- df %>%
 df_means <- df_means %>% 
   ungroup()
 ```
-
-
 
 ```{r}
 ggplot(df_means) +
@@ -226,14 +224,14 @@ for (name in df_list) {
   
   assign(paste(name, "sum_C", sep = "_"), sum)
   
-  if(("TRNF"==name| "TRPM" ==name) & "LIVECRM" %in% names(df_i)){
+  if(("TRNF"==name| "TRPM" ==name) & "LIVECREM" %in% names(df_i)){
     df_i <- df_i %>% 
       mutate(livecrem_MTC = LIVECREM*area_ac)    
     livecrem_MTC <- sum(na.omit(df_i$livecrem_MTC))
     print(paste("Carbon removed (MTC) =", round(livecrem_MTC,2)))
     removed_BDT <- livecrem_MTC/0.50/0.907185
     print(paste("Biomass removed via mechanical treatments (BDT) =", round(removed_BDT,2)))
-  } else if(("TRNF"==name| "TRPM" ==name) & !("LIVECRM" %in% names(df_i))){
+  } else if(("TRNF"==name| "TRPM" ==name) & !("LIVECREM" %in% names(df_i))){
   print("no biomass removed via mechanical treatments ('BR')")
 }
   

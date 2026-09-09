@@ -85,7 +85,7 @@ for (shp_path in shp_files) {
     mean_results,
     data.frame(
       shapefile = basename(shp_path),
-      mean_value = paste0(round(m_val*100, 4), "%")
+      mean_value = paste0(round(m_val*100, 3), "%")
     )
   )
   plot(clipped_raster)
@@ -96,7 +96,7 @@ for (shp_path in shp_files) {
 # View final results
 ```{r}
 results <- mean_results %>% 
-  rename("Mean probability of wildfire occurrence" = mean_value)
+  rename("Annual probability of wildfire occurrence" = mean_value)
 results <- flextable(results)
 results <- bold(results, j = 2)
 results <- fontsize(results, size = 14, part = "all")
