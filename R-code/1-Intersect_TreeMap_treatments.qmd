@@ -520,80 +520,182 @@ for (i in 1:length(shp_list)) {
 
 # Exit the script if no polygons overlap with Treemap
 
-```{r early-exit}
+```{r results = 'asis'}
 obj <- get0("treemap_areas_list", inherits = TRUE)
 
-if (is.null(obj)) {
-  knitr::knit_exit()
-}
-
-if (length(obj) == 0) {
+if (is.null(obj) | length(obj) == 0 | obj<1) {
+  cat("<div style='color:red; font-size:30px;'>")
+  print("No treatments contain enough Treemap overlap to run the QM. Exiting the script.")
+  cat("</div>")
   knitr::knit_exit()
 }
 ```
 
+
+## Plot the project in California to check FVS variant selection
+
+```{r}
+ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
+```
+
+```{r}
+fvs_varloc <- st_as_sf(fvs_varloc) %>% 
+  filter(FVSVariant %in% c("WS", "NC", "CA", "SO")) %>% 
+  group_by(FVSVariant) |>
+  summarise(geometry = st_union(geometry), .groups = "drop")
+```
+
+```{r}
+centroids <- st_centroid(combined_shp %>% st_zm())
+circle_buffer <- st_buffer(centroids, dist = 5000)
+
+variant_fig <- ggplot() +
+      geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
+    geom_sf(data = ca, fill = NA)+
+   geom_sf(data = circle_buffer, col = "red", fill = "red")
+```
+
+# Print important info for FVS:
+```{r}
+variant_fig
+```
+
+```{r}
+plot_all
+```
+
+# Make a table with essential info for each TCN
+
+## Find TreeMap acres for each polygon as a percentage of total shapefile area
+
+Treemap acres = the acreage of the polygon that excludes non-forested pixels
+
+```{r}
+treemap_areas_df<- tibble(
+  Name = names(treemap_areas_list),
+  Value = unlist(treemap_areas_list)
+) 
+
+treemap_areas_df <- treemap_areas_df %>% 
+  rename("TreeMap Acres" = Value) %>% 
+  rename(TCN = Name)
+```
+
+## Sum areas for treatments with multipart polygons
+```{r}
+shp_areas_list_sums <- sapply(shp_areas_list, sum)
+
+shp_areas_df <- tibble(
+  Name = names(shp_areas_list_sums),
+  Value = unlist(shp_areas_list_sums)
+) 
+```
+
+## Do the same for TCN
+```{r, warning = F}
+shapefile_list <- sapply(shapefile_list, unique)
+
+shapefile_df <- tibble(
+  TCN = names(shapefile_list),
+  shapefile = unlist(shapefile_list)
+)
+```
+
+```{r}
+shp_areas_df <- shp_areas_df %>% 
+  mutate(Value = Value/4046.86) %>% 
+  mutate(Value = round(Value)) %>% 
+  rename("Shapefile Acres" = Value) %>% 
+  rename(TCN = Name)
+
+if(length(shapefile_df)>0){
+ shp_areas_df <- full_join(shapefile_df, shp_areas_df) 
+}
+
+areas_table <- full_join(shp_areas_df, treemap_areas_df) %>% 
+  mutate(Percentage = round(`TreeMap Acres`/`Shapefile Acres`*100, 1)) %>% 
+  arrange(TCN)
+```
+
+## Add column for if it's too small for QM
+```{r}
+areas_table <- areas_table %>% 
+  mutate(`QM calculations?` = ifelse(`TreeMap Acres`<.5, 
+        "No", "Yes")) %>% 
+  mutate(`TreeMap Acres`=round(`TreeMap Acres`))
+```
+
+
+```{r}
+flextable(areas_table)
+```
+
+
+
+## FVS Variant  selection is/are `r unique(combined_shp$FVSVariant)`
 
 # Impact Area calculations
 
 *For projects that do not include Fuels Reduction or Pest Management, this section can be removed.*
 
-## Exclude shapefiles from impact analysis if acreage <5 ac
+## Exclude shapefiles from impact analysis if treemap acreage <5 ac
 ```{r}
 not_tiny <- treemap_areas_list >=5
 shp_list_impact <- shp_list[not_tiny]
 ```
 
-
 ### Create buffer polygons around each treatment and mask out the treatment area
 ```{r}
-buffers <- list()
-for (i in 1:length(shp_list_impact)) {
-  shp_sf <- shp_list_impact[[i]]
-  shp_sf$trt_area <- st_area(shp_sf)
-  shp <- vect(shp_sf)
-  base_name <- shp$TCN
-
-  if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
-    print(paste("Skipping TCN =", shp_sf$TCN))
-    next
-  }
-
-  shp_buff <- buffer(shp, width = buffer_dist)
-  shp_buff <- aggregate(
-    shp_buff,
-    by = c("FVSVariant", "TCN"),
-    fun = function(x) x[1]
-  )
-
-  shp_buff <- erase(shp_buff, shp)
+if(length(shp_list_impact)>0){
+  buffers <- list()
+  for (i in 1:length(shp_list_impact)) {
+    shp_sf <- shp_list_impact[[i]]
+    shp_sf$trt_area <- st_area(shp_sf)
+    shp <- vect(shp_sf)
+    base_name <- shp$TCN
   
-  shp_buff_sf <- st_as_sf(shp_buff)
-  shp_buff_sf$trt_area <- as.numeric(shp_buff_sf$trt_area)
-  buffers[[base_name]] <- shp_buff_sf
+    if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
+      print(paste("Skipping TCN =", shp_sf$TCN))
+      next
+    }
+  
+    shp_buff <- buffer(shp, width = buffer_dist)
+    shp_buff <- aggregate(
+      shp_buff,
+      by = c("FVSVariant", "TCN"),
+      fun = function(x) x[1]
+    )
+  
+    shp_buff <- erase(shp_buff, shp)
+    
+    shp_buff_sf <- st_as_sf(shp_buff)
+    shp_buff_sf$trt_area <- as.numeric(shp_buff_sf$trt_area)
+    buffers[[base_name]] <- shp_buff_sf
+    }
+    
+    ### Combine them and filter for fuels reduction, if it's listed in the shapefile attributes
+    if("Tobj" %in% names(buffers[[1]])){
+      buff_combined <- buffers |> bind_rows() %>% 
+        filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
+    } else{
+      buff_combined <- buffers |> bind_rows() 
+    }
+
+  impact_map_full <- ggplot(buff_combined)+
+    geom_sf(aes(fill = TCN), alpha = .3)+
+    ggtitle("Before removing overlaps")
+
 }
-```
-
-### Combine them and filter for fuels reduction, if it's listed in the shapefile attributes
-```{r}
-if("Tobj" %in% names(buffers[[1]])){
-  buff_combined <- buffers |> bind_rows() %>% 
-    filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
-} else{
-  buff_combined <- buffers |> bind_rows() 
-}
-```
-
-
-```{r}
-impact_map_full <- ggplot(buff_combined)+
-  geom_sf(aes(fill = TCN), alpha = .3)+
-  ggtitle("Before removing overlaps")
 ```
 
 #### Make a function for assigning the largest remaining polygon to `keep` and adding any polygons that overlap >50% with it to `ignore`
 ```{r}
 ignore_ia <- function(){
-  if(nrow(buff_combined)==1){
+  if(!exists("buff_combined") ){
+    return("activity is too small for impact area calculations; exiting from function")
+  }
+  
+  if(nrow(buff_combined)==1 ){
     return("only one activity; exiting from function")
   }
   keep <- buff_combined %>% 
@@ -932,35 +1034,6 @@ for (i in seq_along(map_list2)) {
   print(names(map_list2)[i])
   print(map_list2[[i]])
 }
-```
-
-## Plot the project in California to check FVS variant selection
-
-```{r}
-ca <- st_read(file.path(ca_dir, "CA_State_TIGER2016_5070.shp"))
-```
-
-```{r}
-fvs_varloc <- st_as_sf(fvs_varloc) %>% 
-  filter(FVSVariant %in% c("WS", "NC", "CA", "SO")) %>% 
-  group_by(FVSVariant) |>
-  summarise(geometry = st_union(geometry), .groups = "drop")
-```
-
-```{r}
-centroids <- st_centroid(combined_shp %>% st_zm())
-circle_buffer <- st_buffer(centroids, dist = 5000)
-
-variant_fig <- ggplot() +
-      geom_sf(data = fvs_varloc,  aes(fill = FVSVariant), alpha = 0.2)+
-    geom_sf(data = ca, fill = NA)+
-   geom_sf(data = circle_buffer, col = "red", fill = "red")
-```
-
-# Important info for FVS runs:
-
-```{r}
-variant_fig
 ```
 
 ```{r}

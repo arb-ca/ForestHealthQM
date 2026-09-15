@@ -29,21 +29,35 @@ require(flextable)
 ## Type = `r type`
 
 ## Load the FVS output files
-```{r}
+```{r results = 'asis'}
 if(type == "TA"){
   fvs_output_file <- paste0(project_ID, "/", project_ID, "_", TCN, "_treatment", "_carbon")
   fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
   fvs_output_file
-  df <- read_excel(fvs_output_file, col_types = c("guess", "guess", "guess", "guess", "guess", "numeric"))
+  if(exists(fvs_output_file)==FALSE){
+    cat("<div style='color:red; font-size:30px;'>")
+    print("ALERT! FVS Output file was not found. Please check for typos in the file name.")
+    cat("</div>")
+    knitr::knit_exit()
+  } else{
+    df <- read_excel(fvs_output_file, col_types = c("guess", "guess", "guess", "guess", "guess", "numeric"))
+  }
 }
 ```
 
-```{r}
+```{r results = 'asis'}
 if(type == "IA"){
   fvs_output_file <- paste0(project_ID, "/", project_ID, "_", TCN, "_IA", "_TRIAADS")
   fvs_output_file <- paste0(fvs_output_dir, fvs_output_file, ".xlsx")
   fvs_output_file
-  df <- read_excel(fvs_output_file)
+  if(exists(fvs_output_file)==FALSE){
+    cat("<div style='color:red; font-size:30px;'>")
+    print("ALERT! FVS Output file was not found. Please check for typos in the file name.")
+    cat("</div>")
+    knitr::knit_exit()
+  } else{
+    df <- read_excel(fvs_output_file)
+  }
 }
 ```
 
@@ -94,7 +108,6 @@ areas <- areas %>%
   filter(TM_ID > 0) %>% 
   mutate(Stand_ID = as.character(TM_ID))
 ```
-
 
 # Plot average aboveground live values
 ```{r}
