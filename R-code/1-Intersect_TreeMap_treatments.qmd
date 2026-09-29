@@ -283,7 +283,7 @@ for(i in 1:length(shp_list)){
     shp_list[[i]]$TCN <- paste0(i, "new")
     print(shp_list[[i]]$TCN)
   }else{
-    shp_list[[i]]$TCN <- as.character(shp_list[[i]]$TCN)
+    shp_list[[i]]$TCN <- shp_list[[i]]$TCN |> round(2) |> as.character()
   }
   if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
     print("CREATING TCNs!")
@@ -521,9 +521,7 @@ for (i in 1:length(shp_list)) {
 # Exit the script if no polygons overlap with Treemap
 
 ```{r results = 'asis'}
-obj <- get0("treemap_areas_list", inherits = TRUE)
-
-if (is.null(obj) | length(obj) == 0 | obj<1) {
+if (any(sapply(treemap_areas_list, function(x) is.null(x) || x == 0))) {
   cat("<div style='color:red; font-size:30px;'>")
   print("No treatments contain enough Treemap overlap to run the QM. Exiting the script.")
   cat("</div>")
