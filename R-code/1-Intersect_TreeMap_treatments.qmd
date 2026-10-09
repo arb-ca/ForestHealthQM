@@ -427,7 +427,7 @@ combined_shp <- combined_shp %>%
 ```
 
 ```{r}
-plot_all <- mapview::mapview(combined_shp, zcol = "TCN")
+plot_all <- mapview::mapview(combined_shp, zcol = "TCN", map.types = c("Esri.WorldImagery", "OpenStreetMap"))
 
 plot_all
 ```
@@ -754,99 +754,90 @@ ignore_ia()
 ```
 
 ## Remove treatment areas from impact areas where they overlap
+## Map final impact areas
 ```{r}
-buff_combined <- st_difference(buff_combined, st_union(combined_shp))
-```
-
-#### Map final impact area boundaries
-```{r}
-impact_map_filtered <- ggplot(buff_combined)+
-  geom_sf(aes(fill = TCN), alpha = .3)+
-  ggtitle("After removing overlaps")
-```
-
-```{r, out.width="100%", fig.height=8}
-grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
+if(exists("buff_combined") ){
+  buff_combined <- st_difference(buff_combined, st_union(combined_shp))
+  impact_map_filtered <- ggplot(buff_combined)+
+    geom_sf(aes(fill = TCN), alpha = .3)+
+    ggtitle("After removing overlaps")
+  grid.arrange(impact_map_full,impact_map_filtered, nrow = 2)
+}
 ```
 
 #### Identify Pest Management treatments that need impact area calculations
 ```{r}
-if("Pest_Management" %in% names(combined_shp)){
-  PM_TCNs <- combined_shp %>% 
-    filter(Tobj =="Pest_Management") %>% 
-    select(TCN) %>% 
-    st_drop_geometry() %>% 
-    unlist() 
-  impact_list <- c(buff_combined$TCN, PM_TCNs)
-} else{
-  impact_list <- buff_combined$TCN
+if(exists("buff_combined") ){
+  if("Pest_Management" %in% names(combined_shp)){
+    PM_TCNs <- combined_shp %>% 
+      filter(Tobj =="Pest_Management") %>% 
+      select(TCN) %>% 
+      st_drop_geometry() %>% 
+      unlist() 
+    impact_list <- c(buff_combined$TCN, PM_TCNs)
+  } else{
+    impact_list <- buff_combined$TCN
+  }
 }
 ```
 
 ```{r}
-buffers_final <- buff_combined <- buffers |> bind_rows() %>% 
-  filter(TCN %in% impact_list)
+if(exists("buff_combined") ){
+  buffers_final <- buff_combined <- buffers |> bind_rows() %>% 
+    filter(TCN %in% impact_list)
+}
 ```
-
-
-## The TCNs that will have impact area calculations are `r buff_combined$TCN`
 
 ## Intersect the impact area polygons with TreeMap
 ```{r}
-for(i in 1:nrow(buffers_final)){
-  shp_buff_sf <- buffers_final[i,]
-  shp_buff_sf <- st_transform(shp_buff_sf, crs(tmrast))
-  shp_buff <- vect(shp_buff_sf )
-  tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
-    as.polygons()
-
-  # Intersect
-  intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff) %>% 
-    st_as_sf()
+if(exists("buff_combined") ){
+  for(i in 1:nrow(buffers_final)){
+    shp_buff_sf <- buffers_final[i,]
+    shp_buff_sf <- st_transform(shp_buff_sf, crs(tmrast))
+    shp_buff <- vect(shp_buff_sf )
+    tm_poly_buff <- crop(tmrast, shp_buff, mask = T) %>% 
+      as.polygons()
   
-  if(nrow(intersected_sf_buff)==0){
-    print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND TCN", shp_buff$TCN))
-    next()
-  }
-  
-  # Remove columns
-  intersected_sf_buff  <- intersected_sf_buff  %>% 
-    select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
-  # Calculate areas
-  
-  intersected_buff  <- intersected_sf_buff  %>% 
-    mutate(area_m = as.numeric(st_area(intersected_sf_buff))) %>% 
-    st_drop_geometry() %>% 
-    group_by(TM_ID, FVSVariant) %>% 
-    summarize(area_m = sum(area_m),  .groups = "keep") %>% 
-    mutate(area_ac = area_m/4046.8726098743)
+    # Intersect
+    intersected_sf_buff <- terra::intersect(tm_poly_buff, shp_buff) %>% 
+      st_as_sf()
     
-  # Write results to table and to shapefile (for TRIAADS)
-  file_name <- paste(temp_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
-  write_xlsx(intersected_buff, file_name)
-  print(paste0(shp_buff_sf$TCN, ": Created TreeMap Polygons for impact area"))
-  
-  shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
-  shp_name <- gsub("\\.", "_", shp_name)
-  st_write(obj = intersected_sf_buff, dsn = paste0(shp_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
-  
-  # Zip the shapefiles for easier import into TRIAADS
-  zip_files <- list.files(full.names = TRUE, recursive = T)
-  zip_files <- zip_files[grepl(shp_name, basename(zip_files), ignore.case = TRUE)]
-  zip_files <- gsub("^\\./", "", zip_files)
- 
-  zip_name <- paste0(triaads_output_dir,"/", shp_name, ".zip")
-  zip(zipfile = zip_name, files = zip_files)
-  file.remove(zip_files)
+    if(nrow(intersected_sf_buff)==0){
+      print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND TCN", shp_buff$TCN))
+      next()
+    }
+    
+    # Remove columns
+    intersected_sf_buff  <- intersected_sf_buff  %>% 
+      select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+    # Calculate areas
+    
+    intersected_buff  <- intersected_sf_buff  %>% 
+      mutate(area_m = as.numeric(st_area(intersected_sf_buff))) %>% 
+      st_drop_geometry() %>% 
+      group_by(TM_ID, FVSVariant) %>% 
+      summarize(area_m = sum(area_m),  .groups = "keep") %>% 
+      mutate(area_ac = area_m/4046.8726098743)
+      
+    # Write results to table and to shapefile (for TRIAADS)
+    file_name <- paste(temp_dir, "/", "IA_areas_", project_ID, "_", shp_buff_sf$TCN, ".xlsx", sep = "")
+    write_xlsx(intersected_buff, file_name)
+    print(paste0(shp_buff_sf$TCN, ": Created TreeMap Polygons for impact area"))
+    
+    shp_name <- paste("intersected_IA",  project_ID, shp_buff_sf$TCN, sep = "_")
+    shp_name <- gsub("\\.", "_", shp_name)
+    st_write(obj = intersected_sf_buff, dsn = paste0(shp_name, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+    
+    # Zip the shapefiles for easier import into TRIAADS
+    zip_files <- list.files(full.names = TRUE, recursive = T)
+    zip_files <- zip_files[grepl(shp_name, basename(zip_files), ignore.case = TRUE)]
+    zip_files <- gsub("^\\./", "", zip_files)
+   
+    zip_name <- paste0(triaads_output_dir,"/", shp_name, ".zip")
+    zip(zipfile = zip_name, files = zip_files)
+    file.remove(zip_files)
+  }
 }
-```
-
-
-### Map for one impact area to check -- remove this to speed up the script
-```{r}
-ggplot(shp_buff_sf)+
-  geom_sf()+
-  geom_sf(data = intersected_sf_buff)
 ```
 
 # Make a table with essential info for each TCN
@@ -913,8 +904,13 @@ areas_table <- areas_table %>%
 
 ## Add a column for whether it needs impact area calculations
 ```{r}
-areas_table <- areas_table %>% 
+if(!exists("buff_combined") ){
+  areas_table <- areas_table %>% 
+  mutate(`Impact area calculations?` = "No")
+} else{
+  areas_table <- areas_table %>% 
   mutate(`Impact area calculations?` = ifelse(TCN %in% buff_combined$TCN, "Yes", "No"))
+}
 ```
 
 # Maps & Overlaps
