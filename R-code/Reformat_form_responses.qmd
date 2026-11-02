@@ -12,6 +12,7 @@ format:
 require(tidyverse)
 require(readxl)
 require(writexl)
+require(openxlsx)
 ```
 
 # Load form responses
@@ -22,7 +23,7 @@ df <- read_excel("C:/Users/ctubbesi/OneDrive - California Air Resources Board/Do
 
 # Define what row you want to start on
 ```{r}
-start_id <- 165
+start_id <- 173
 start_id_supp <- 4
 ```
 
@@ -277,3 +278,41 @@ for(i in 1:nrow(dfs)){
 }
 print("Finished reshaping Supplementary responses")
 ```
+
+# Edit formatting of each raw file
+```{r}
+src <- "../../form_responses/raw/"           # folder with your originals
+dst <- "../../form_responses/formatted/"   # output folder (keeps originals safe)
+
+MAX_WIDTH <- 50   # cap so very long text doesn't create giant columns
+wrap <- createStyle(wrapText = TRUE, valign = "top")
+
+files <- list.files(src, pattern = "\\.xlsx$", full.names = TRUE)
+
+for (f in files) {
+  wb <- loadWorkbook(f)
+
+  for (sheet in names(wb)) {
+    # Read the sheet only to measure content (no headers, keep empty rows/cols)
+    dat <- read.xlsx(wb, sheet = sheet, colNames = FALSE,
+                     skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+    if (nrow(dat) == 0) next
+
+    # Wrap text; stack = TRUE keeps existing fonts, fills, borders, etc.
+    addStyle(wb, sheet, wrap,
+             rows = 1:nrow(dat), cols = 1:ncol(dat),
+             gridExpand = TRUE, stack = TRUE)
+
+    # Width = longest line in each column, plus padding, capped at MAX_WIDTH
+    widths <- sapply(dat, function(x) {
+      lens <- unlist(lapply(strsplit(as.character(x), "\n"), nchar))
+      if (length(lens) == 0 || all(is.na(lens))) 8 else max(lens, na.rm = TRUE)
+    })
+    setColWidths(wb, sheet, cols = 1:ncol(dat), widths = pmin(widths + 2, MAX_WIDTH))
+  }
+
+  saveWorkbook(wb, file.path(dst, basename(f)), overwrite = TRUE)
+  message("Done: ", basename(f))
+}
+```
+
