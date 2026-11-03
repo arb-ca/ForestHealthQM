@@ -674,7 +674,7 @@ if(length(shp_list_impact)>0){
     ### Combine them and filter for fuels reduction, if it's listed in the shapefile attributes
     if("Tobj" %in% names(buffers[[1]])){
       buff_combined <- buffers |> bind_rows() %>% 
-        filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n"))
+        filter(Tobj %in% c("Fuels Reduction", "Fuels_Reduction", "Prescribed_Fire", "Prescribed_Fire\r\n", "Fuels_Reduction\r\n", "Pest_Management"))
     } else{
       buff_combined <- buffers |> bind_rows() 
     }
