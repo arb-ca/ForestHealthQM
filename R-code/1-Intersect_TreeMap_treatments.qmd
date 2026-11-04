@@ -230,12 +230,12 @@ shp_list <- lapply(shp_list, rename_Tobj_column)
 ### Rename Activity column 
 ```{r}
 # Define possible names for the activity column
-Tobj_variants <- c("TActivity", "Treatment")
+Tact_variants <- c("TActivity", "Treatment", "Tactivity", "TAcitvity")
 
 # Function to rename the activity column in a single sf object
-rename_Tobj_column <- function(sf_obj) {
+rename_Tact_column <- function(sf_obj) {
   current_names <- names(sf_obj)
-  match_name <- current_names[current_names %in% Tobj_variants]
+  match_name <- current_names[current_names %in% Tact_variants]
   if (length(match_name) == 1) {
     names(sf_obj)[names(sf_obj) == match_name] <- "Tactivity"
   }
@@ -282,7 +282,7 @@ for(i in 1:length(shp_list)){
     print("CREATING TCNs!")
     shp_list[[i]]$TCN <- paste0(i, "new")
     print(shp_list[[i]]$TCN)
-  }else{
+  }else if(!class(shp_list[[i]]$TCN) == "character"){ ### Make sure TCN is stored as a character string
     shp_list[[i]]$TCN <- shp_list[[i]]$TCN |> round(2) |> as.character()
   }
   if(any(shp_i$TCN==0)|any(is.na(shp_i$TCN))){
@@ -292,7 +292,6 @@ for(i in 1:length(shp_list)){
   }
 }
 ```
-
 
 ## List treatment types 
 This might not show treatment types if it's not listed in the source shapefile
@@ -414,14 +413,25 @@ for (i in 1:length(shp_list)) {
 
 ## Combine all sf objects for mapping
 ```{r}
+shp_list <- lapply(shp_list, function(x) {
+  if ("ID" %in% names(x)) {
+    x$ID <- as.character(x$ID)
+  }
+  x
+})
+```
+
+```{r}
 combined_shp <- shp_list |> bind_rows()
 
 # Ensure valid geometries
 combined_shp <- st_make_valid(combined_shp %>% st_zm)
 ```
 
+## Calculate area and remove unnecessary columns
 ```{r}
 combined_shp <- combined_shp %>%
+  select(TCN, Tobj, FVSVariant) |> 
   mutate(area = st_area(geometry)) %>%
   arrange(desc(area))  # Largest first
 ```
