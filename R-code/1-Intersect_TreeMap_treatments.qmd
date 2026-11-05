@@ -430,10 +430,18 @@ combined_shp <- st_make_valid(combined_shp %>% st_zm)
 
 ## Calculate area and remove unnecessary columns
 ```{r}
-combined_shp <- combined_shp %>%
-  select(TCN, Tobj, FVSVariant) |> 
-  mutate(area = st_area(geometry)) %>%
-  arrange(desc(area))  # Largest first
+if("Tobj" %in% names(combined_shp)){
+  combined_shp <- combined_shp %>%
+    select(TCN, Tobj, FVSVariant) |> 
+    mutate(area = st_area(geometry)) %>%
+    arrange(desc(area))  # Largest first
+} else{
+  combined_shp <- combined_shp %>%
+    select(TCN, FVSVariant) |> 
+    mutate(area = st_area(geometry)) %>%
+    arrange(desc(area))  # Largest first
+}
+
 ```
 
 ```{r}
