@@ -413,7 +413,8 @@ reforestation activity includes site preparation, planting, or both.
 - Replace the file paths and directory locations
 - Set the TreeMap vintage in Script 1 based on the year of your
   treatments
-- Define the project name, treatment name, and shapefile name<br>
+- Define the project name, treatment name, and shapefile name
+- Define `fire_year` and `rf_shp_name` <br>
 
 ### 4. Run Scripts 1, 2, 0 and 7, in that order
 
