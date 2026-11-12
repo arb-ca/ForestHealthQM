@@ -51,8 +51,8 @@ if (length(missing_packages)>0) {
 lapply(required_packages, require, character.only = TRUE)
 ```
 
-# Create necessary folders if they don't already exist
 ```{r, include = F}
+# Create necessary folders if they don't already exist
 if (!dir.exists("../../areas")) {
   dir.create("../../areas")
 }
@@ -86,14 +86,11 @@ if (!dir.exists("TRIAADS/gigafire-randig-calfire-treemap/data/randig_outputs")) 
 }
 ```
 
-# Load FVS variants map
+# Setup
+
+### Load FVS variants map
 ```{r}
 fvs_varloc <- st_read(fvs_varloc_shp_path, quiet = T)
-```
-
-### Clear temp directory (`temp`)
-```{r}
-#unlink(paste0(temp_dir, "/*"), recursive = TRUE)
 ```
 
 ### Read in TreeMap dataset(s)
@@ -119,7 +116,7 @@ if(tm == 2016){
 }
 ```
 
-## If necessary, unzip treatment shapefiles
+### If necessary, unzip treatment shapefiles
 
 ```{r}
 # List all zipped files in the Shapefiles folder
@@ -131,8 +128,7 @@ for (zip_file in zip_files) {
 }
 ```
 
-## List shapefiles in `trt_dir`
-
+### List shapefiles in `trt_dir`
 ```{r}
 shapefiles <- list.files(
   path = trt_dir,
@@ -142,7 +138,7 @@ shapefiles <- list.files(
 )
 ```
 
-# Show an error and exit the script if there aren't any shapefiles
+### Show an error and exit the script if there aren't any shapefiles
 ```{r results = 'asis'}
 if(length(shapefiles)==0){
   cat("<div style='color:red; font-size:30px;'>")
@@ -173,7 +169,7 @@ shapefiles <- shapefiles[!grepl("Boundary", shapefiles)]
 shapefiles <- shapefiles[!grepl("boundary", shapefiles)]
 ```
 
-## Create shp_list
+### Create shp_list
 ```{r}
 shp_list <- list()
 for(i in 1:length(shapefiles)){
@@ -256,7 +252,6 @@ for(i in 1:length(shp_list)){
 
 ## If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
 
-IF `separate_tcns` = "no", then this will not run.
 ```{r}
 shp_list_new <- list()
 for(i in 1:length(shp_list)){
@@ -296,12 +291,40 @@ for(i in 1:length(shp_list)){
 ## List treatment types 
 This might not show treatment types if it's not listed in the source shapefile
 ```{r}
-for(i in 1:length(shp_list)){
-  print(paste(unique(shp_list[[i]]$TCN), "is", shp_list[[i]]$Tobj %>% unique()))
+fuel_pest_tcns <- character(0)
+all_tobj <- character(0)
+for (i in seq_along(shp_list)) {
+  tcn  <- unique(shp_list[[i]]$TCN)
+  tobj <- unique(shp_list[[i]]$Tobj)
+  if(is.null(tobj)){
+      print(paste(tcn, "treatment type is not provided in the shapefile"))
+  } else{
+      print(paste(tcn, "is", tobj))
+  }
+
+  # Keep all non-NA Tobj values, named by TCN
+  hits <- tobj[!is.na(tobj)]
+  if(!is.null(hits)){
+      names(hits) <- rep(tcn[1], length(hits))
+       all_tobj <- c(all_tobj, hits)
+  }
+
+
+  # Flag if any Tobj value contains "fuel" or "pest" (case-insensitive)
+  if (any(str_detect(tobj, regex("fuel|pest", ignore_case = TRUE)), na.rm = TRUE)) {
+    fuel_pest_tcns <- c(fuel_pest_tcns, tcn)
+  }
+
 }
+
+fuel_pest_tcns <- unique(fuel_pest_tcns)
+
+# Remove duplicate TCN/Tobj pairs
+all_tobj <- all_tobj[!duplicated(paste(names(all_tobj), all_tobj))]
 ```
 
 ## OPTIONAL STEP: Combine shapefiles according to `combine_tcns` and `combine_tcns_2` vars
+If `combine_tcns <- c()` and `combine_tcns_2 <- c()` in `project_vars.R`, then this step is skipped.
 ```{r}
 if(length(combine_tcns)>0){
   idx <- map_lgl(shp_list, ~ any(.x$TCN %in% combine_tcns))
@@ -446,8 +469,6 @@ if("Tobj" %in% names(combined_shp)){
 
 ```{r}
 plot_all <- mapview::mapview(combined_shp, zcol = "TCN", map.types = c("Esri.WorldImagery", "OpenStreetMap"))
-
-plot_all
 ```
 
 # Areas calculations for treatment area
@@ -464,9 +485,12 @@ for (i in 1:length(shp_list)) {
   shp_sf <- shp_list[[i]]
   shp <- vect(shp_sf)
   base_name <- shp$TCN
+  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
+  shp_areas_list[[base_name]] <- st_area(shp_sf)
+  shapefile_list[[base_name]] <- shp_sf$shapefile
 
   if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
-    print(paste("Skipping TCN =", shp_sf$TCN))
+    print(paste("Skipping TCN =", shp_sf$TCN, "based on `noFVS` in `project_vars.R`"))
     next
   }
 
@@ -477,6 +501,7 @@ for (i in 1:length(shp_list)) {
   intersected <- terra::intersect(tm_poly, shp)
   if(nrow(intersected)==0){
     print(paste("THERE IS NO OVERLAP BETWEEN TREEMAP AND", shp$TCN))
+    treemap_areas_list[[base_name]] <- 0
     next()
   }
 
@@ -497,13 +522,11 @@ for (i in 1:length(shp_list)) {
   
   # Save info
   treemap_areas_list[[base_name]] <- sum(intersected$area_ac)
-  shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
-  shp_areas_list[[base_name]] <- st_area(shp_sf)
-  shapefile_list[[base_name]] <- shp_sf$shapefile
+
   
-  # Exit the loop if total treemap areas is less than 0.5 ac
-  if(sum(intersected$area_ac)<0.5){
-    print(paste0(shp$TCN, ": Skipping because area < 0.5 ac"))
+  # Exit the loop if total treemap areas is less than 0.5 ac & treatment type is fuel reduction or pest
+  if(sum(intersected$area_ac)<0.5 & shp_sf$TCN %in% fuel_pest_tcns){
+    print(paste0(shp$TCN, ": Skipping because area < 0.5 ac and type is clearly fuels reduction or pest management"))
     next()
   }
   
@@ -536,10 +559,13 @@ for (i in 1:length(shp_list)) {
 }
 ```
 
-# Exit the script if no polygons overlap with Treemap
+# Exit the script if no polygons overlap with Treemap and the treatment type is fuels reduction or pest management
+
+If the treatment type is reforestation, or if treatment type is not provided in the shapefile, then continue with the script.
 
 ```{r results = 'asis'}
-if (any(sapply(treemap_areas_list, function(x) is.null(x) || x == 0))) {
+if (any(sapply(treemap_areas_list, function(x) is.null(x) || x == 0)) & length(fuel_pest_tcns) > 0 &&
+    all(sapply(fuel_pest_tcns, function(x) grepl("fuel|pest", x)))) {
   cat("<div style='color:red; font-size:30px;'>")
   print("No treatments contain enough Treemap overlap to run the QM. Exiting the script.")
   cat("</div>")
@@ -571,14 +597,6 @@ variant_fig <- ggplot() +
    geom_sf(data = circle_buffer, col = "red", fill = "red")
 ```
 
-# Print important info for FVS:
-```{r}
-variant_fig
-```
-
-```{r}
-plot_all
-```
 
 # Make a table with essential info for each TCN
 
@@ -636,9 +654,19 @@ areas_table <- full_join(shp_areas_df, treemap_areas_df) %>%
 ## Add column for if it's too small for QM
 ```{r}
 areas_table <- areas_table %>% 
-  mutate(`QM calculations?` = ifelse(`TreeMap Acres`<.5, 
+  mutate(`QM calculations? (if fuel treatment)`  = ifelse(`TreeMap Acres`<.5, 
         "No", "Yes")) %>% 
   mutate(`TreeMap Acres`=round(`TreeMap Acres`))
+```
+
+```{r}
+
+tobj_lookup <- data.frame(
+  TCN  = names(all_tobj),
+  Tobj = unname(all_tobj),
+  stringsAsFactors = FALSE
+)
+
 ```
 
 
@@ -827,7 +855,7 @@ if(exists("buff_combined") ){
     
     # Remove columns
     intersected_sf_buff  <- intersected_sf_buff  %>% 
-      select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT
+      select(TM_ID, FVSVariant) # SAVE THIS FOR EACH TREATMENT  
     # Calculate areas
     
     intersected_buff  <- intersected_sf_buff  %>% 
@@ -914,7 +942,7 @@ areas_table <- full_join(shp_areas_df, treemap_areas_df) %>%
 ## Add column for if it's too small for QM
 ```{r}
 areas_table <- areas_table %>% 
-  mutate(`QM calculations?` = ifelse(`TreeMap Acres`<.5, 
+  mutate(`QM calculations? (if fuel treatment)` = ifelse(`TreeMap Acres`<.5, 
         "No", "Yes")) %>% 
   mutate(`TreeMap Acres`=round(`TreeMap Acres`))
 ```
@@ -928,6 +956,14 @@ if(!exists("buff_combined") ){
 } else{
   areas_table <- areas_table %>% 
   mutate(`Impact area calculations?` = ifelse(TCN %in% buff_combined$TCN, "Yes", "No"))
+}
+```
+
+
+```{r}
+if(nrow(tobj_lookup)>0){
+  areas_table <- areas_table %>%
+  left_join(tobj_lookup, by = "TCN")
 }
 ```
 
@@ -1052,5 +1088,7 @@ for (i in seq_along(map_list2)) {
 plot_all
 flextable(areas_table)
 ```
+
+## Note: If treatment type is Reforestation, run the full QM regardless of what the table says in the "QM calculations?" column.
 
 ## FVS Variant  selection is/are `r unique(combined_shp$FVSVariant)`

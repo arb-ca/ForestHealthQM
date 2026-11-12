@@ -98,7 +98,7 @@ Use these selections in FVS when instructed in the procedures below.
 
 ### 5. Run FVS simulations for the Treatment Area
 
-- [ ]    Open the FVS software and start a new project
+- [ ] Open the FVS software and start a new project
   - To do this, go to `Manage Projects` → `Manage Project.` Type a new project title (such as your project_ID + TCN), click “Make new project”, then go above to “Open selected project” and open it.
 - Under `Manage Project` –\> `Import input data`, upload the treatment area FVS input file into FVS by clicking "Browse" under "Step 1."
   - These files will be located in the folder `FVS_Input` and will follow the naming convention "FVS_input\_" + project_ID + TCN
@@ -348,14 +348,20 @@ If a project includes only site preparation or only planting, the Reforestation 
       - Download and save in the folder `FVS_Output/<Project_ID>`
       - Name the file `Project_ID + TCN + "RF".xlsx`
 
-### 6. Configure and run Script 5 for each of the FVS output files
+### 6. Configure `treatment_vars.R`
+
+- Edit `TCN` and `end_year` to match your treatment
+- Set `type` to `TA`
+- Set `area_ac` to the acreage that will be planted
+
+### 7. Configure and run Script 5 for each of the FVS output files
 
 - Replace the file paths and directory locations at the start of the script to match the FVS output
 - Adjust `area_ac` to match your planned reforestation acreage
 - Set `end_yr` to match End of Project in the Calculator Tool.
 - Run Script 5
 
-### 7. Return to the Forest Restoration & Management **Calculator Tool** excel file.
+### 8. Return to the Forest Restoration & Management **Calculator Tool** excel file.
 
 - Populate the yellow cells with results from Script 5
 

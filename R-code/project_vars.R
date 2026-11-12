@@ -1,10 +1,12 @@
-proj_name <- "2023 MRCA Hazardous Fuels Reduction"
-project_ID <- "22-WP-LAC-47724639"
+proj_name <- "Example Project"
+project_ID <- "12345"
 
 
 ## Define directory with treatment shapefiles in it
-## This can be located anywhere on your computer. It doesn't need to be in the same folder as this code
-trt_dir <- "C:/Users/ctubbesi/OneDrive - California Air Resources Board/Documents/CCI/QMs/Forest Health QM/training/Santiago test runs/22-WP-LAC-47724639/shapefile"
+### This can be located anywhere on your computer. It doesn't need to be in the same folder as this code
+### This folder should ONLY include shapefiles for the project you want to run right now. All shapefiles in the folder will be analyzed.
+### Tip: Make sure the / are facing the right way. Paths written with \ will not be accepted.
+trt_dir <- r("C:/Path/To/Your/Project/Shapefiles/Folder")
 
 ### Define which treatments are site prep, biomass utilization, or other treatment types that do not require FVS inputs.
 ### Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
@@ -19,11 +21,12 @@ combine_tcns_2 <- c() #example: c("3new","4new")
 ###################################################################
 
 ## If there's post-fire reforestation, define the year of the fire 
-fire_year <- 2018
+### e.g. fire_year <- 2018
+fire_year <- YYYY
 
 ## Define the name of the reforestation shapefile (without the full path)
-## This is only needed for reforestation runs
-rf_shp_name <- "71625010_1_1_20250114.shp"
+## This is only needed for reforestation runs. It should end in ".shp"
+rf_shp_name <- "Reforestation shapefile.shp"
 
 ### In most cases, you can leave the below lines as they are
 ###################################################################
@@ -32,6 +35,7 @@ rf_shp_name <- "71625010_1_1_20250114.shp"
 tm <- 2022 # Options = 2016, 2020, 2022
 
 ### Define "data" directory 
+### This is where important reference files are, like TreeMap rasters, FVS variant maps, etc.
 data_dir <- "../../data"
 
 ### Define input and output directories
@@ -42,8 +46,8 @@ output_dir_randig <- "../../randig_shapefiles"
 fvs_input_dir <- "../../FVS_Input"
 fvs_output_dir = "../../FVS_Output/"
 
-
-# Define things within data directory (you shouldn't have to mess with this section)
+# Define paths and file locations within data directory 
+## If you got the "/data" folder from Carmen in its entirety, you shouldn't have to mess with this section)
 ca_dir <- paste0(data_dir, "/ca-state-boundary")
 treemap_dir <- paste0(data_dir, "/TreeMap")
 fvs_varloc_shp_path <- paste0(data_dir, "/FVSVariantMap20210525/FVS_Variants_and_Locations.shp")
