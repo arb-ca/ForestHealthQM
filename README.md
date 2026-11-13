@@ -385,10 +385,10 @@ the the bottom of the Script 1 rendered html.
 5.  [Open FVS software and run simulations for the reforestation and
     baseline
     scenarios](#5-open-fvs-software-and-run-simulations-for-the-reforestation-and-baseline-scenarios)
-6.  [Configure and run Script 5 for each of the FVS output
-    files](#6-configure-and-run-script-5-for-each-of-the-fvs-output-files)
-7.  [Return to the Forest Restoration & Management Calculator Tool excel
-    file](#7-return-to-the-forest-restoration--management-calculator-tool-excel-file)
+6.  [Configure treatment_vars.R](#6-configure-treatment_varsr)
+7.  [Run Script 5](#7-run-script-5)
+8.  [Return to the Forest Restoration & Management Calculator Tool excel
+    file](#8-return-to-the-forest-restoration--management-calculator-tool-excel-file)
 
 ### A note about site preparation and planting activities
 
@@ -408,9 +408,10 @@ reforestation activity includes site preparation, planting, or both.
 
 - Populate the green cells with project information.
 
-### 3. Configure `project_vars.R` and `treatment_vars.R`
+### 3. Configure `project_vars.R`
 
-- Replace the file paths and directory locations
+- Replace the `trt_dir`file path for where your shapefile(s) is/are
+  located
 - Set the TreeMap vintage in Script 1 based on the year of your
   treatments
 - Define the project name, treatment name, and shapefile name
@@ -493,15 +494,23 @@ reforestation activity includes site preparation, planting, or both.
       - Download and save in the folder `FVS_Output/<Project_ID>`
       - Name the file `Project_ID + TCN + "RF".xlsx`
 
-### 6. Configure and run Script 5 for each of the FVS output files
+### 6. Configure `treatment_vars.R`
 
-- Replace the file paths and directory locations at the start of the
-  script to match the FVS output
-- Adjust `area_ac` to match your planned reforestation acreage
+- Edit `TCN` to match your treatment
 - Set `end_yr` to match End of Project in the Calculator Tool.
-- Run Script 5
+- Set `type` to `TA`
+- Set `area_ac` to the acreage that will be planted
 
-### 7. Return to the Forest Restoration & Management **Calculator Tool** excel file.
+### 7. Run Script 5
+
+- Script 5 is run once per FVS output file.
+- Each time you render Script 5, rename the resulting html file with the
+  TCN
+  - e.g. `5-FVS-post-processing-Reforest-2.2.html`
+  - This will keep a record of the Script 5 run that won’t be
+    overwritten the next time you render the file.
+
+### 8. Return to the Forest Restoration & Management **Calculator Tool** excel file.
 
 - Populate the yellow cells with results from Script 5
 
