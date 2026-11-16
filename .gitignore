@@ -12,3 +12,4 @@ R-code/htmls/
 *.Rproj
 *.RData
 R-code/*.html
+*.png

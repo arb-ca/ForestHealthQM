@@ -253,19 +253,22 @@ for(i in 1:length(shp_list)){
 ## If one shapefile contains disparate polygons, separate the polygons into separate shapefiles
 
 ```{r}
-shp_list_new <- list()
-for(i in 1:length(shp_list)){
-
-  shp <- shp_list[[i]]
-  if(nrow(shp)>1){
-    shp_new <- split(shp, seq_len(nrow(shp)))
-    print(paste("SPLITTING SHAPEFILE", shp$TCN))
-    shp_list_new <- c(shp_list_new, shp_new)
-  } else{
-    shp_list_new[[length(shp_list_new)+1]] <- shp
+if(separate_tcns=="yes"){
+  shp_list_new <- list()
+  for(i in 1:length(shp_list)){
+  
+    shp <- shp_list[[i]]
+    if(nrow(shp)>1){
+      shp_new <- split(shp, seq_len(nrow(shp)))
+      print(paste("SPLITTING SHAPEFILE", shp$TCN))
+      shp_list_new <- c(shp_list_new, shp_new)
+    } else{
+      shp_list_new[[length(shp_list_new)+1]] <- shp
+    }
   }
+  shp_list <<- shp_list_new
 }
-shp_list <- shp_list_new
+
 ```
 
 ## Add TCN if there is none or if it's 0. Add "new" to the new TCNs to designate that I assigned them
@@ -430,7 +433,7 @@ shp_list <- lapply(shp_list, function(df) {
 unlink(final_pol_proj_dir)
 for (i in 1:length(shp_list)) {
   shp_sf <- shp_list[[i]]
-  st_write(obj = shp_sf, dsn = paste0(final_pol_proj_dir,"/", project_ID, "_", shp_sf$TCN, ".shp"), driver = "ESRI Shapefile", delete_layer = T, quiet = T)
+  st_write(obj = shp_sf, dsn = paste0(final_pol_proj_dir,"/", project_ID, "_", shp_sf$TCN, ".shp")[1], driver = "ESRI Shapefile", delete_layer = T, quiet = T)
 }
 ```
 
@@ -484,7 +487,7 @@ shapefile_list <- list()
 for (i in 1:length(shp_list)) {
   shp_sf <- shp_list[[i]]
   shp <- vect(shp_sf)
-  base_name <- shp$TCN
+  base_name <- unique(shp$TCN)
   shapefile_name <- paste("intersected", project_ID, unique(shp_sf$TCN), sep = "_")
   shp_areas_list[[base_name]] <- st_area(shp_sf)
   shapefile_list[[base_name]] <- shp_sf$shapefile
@@ -525,7 +528,7 @@ for (i in 1:length(shp_list)) {
 
   
   # Exit the loop if total treemap areas is less than 0.5 ac & treatment type is fuel reduction or pest
-  if(sum(intersected$area_ac)<0.5 & shp_sf$TCN %in% fuel_pest_tcns){
+  if(sum(intersected$area_ac)<0.5 & base_name %in% fuel_pest_tcns){
     print(paste0(shp$TCN, ": Skipping because area < 0.5 ac and type is clearly fuels reduction or pest management"))
     next()
   }
@@ -696,9 +699,9 @@ if(length(shp_list_impact)>0){
     shp_sf <- shp_list_impact[[i]]
     shp_sf$trt_area <- st_area(shp_sf)
     shp <- vect(shp_sf)
-    base_name <- shp$TCN
+    base_name <- unique(shp$TCN)
   
-    if(!is.null("noFVS") & unique(shp_sf$TCN) %in% noFVS){
+    if(!is.null("noFVS") & base_name %in% noFVS){
       print(paste("Skipping TCN =", shp_sf$TCN))
       next
     }

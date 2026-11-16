@@ -11,6 +11,9 @@ trt_dir <- r"(C:/Path/To/Your/Project/Shapefiles/Folder)"
 ### Note: Do not include reforestation treatments in `noFVS`. Even though FVS is not run on them, the FVS input files are used to determine species of regenerating conifers.
 noFVS <- c()
 
+## Define whether you want to split up disparate polygons (default is yes)
+separate_tcns <- "no" # options = "yes", "no"
+
 ## Define which treatments get combined for FVS modeling
 ## If you only have one treatment polygon, leave as empty sets: `c()` 
 combine_tcns <- c() #example: c("1new","2new","5new")
